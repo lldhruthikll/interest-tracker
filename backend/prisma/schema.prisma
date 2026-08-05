@@ -1,0 +1,84 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  name      String   @default("Admin")
+  createdAt DateTime @default(now())
+}
+
+model Borrower {
+  id        Int       @id @default(autoincrement())
+  name      String
+  phone     String
+  address   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  loans     Loan[]
+  payments  Payment[]
+}
+
+model Loan {
+  id              Int              @id @default(autoincrement())
+  borrowerId      Int
+  borrower        Borrower         @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  principal       Float
+  monthlyInterest Float
+  startDate       DateTime
+  dueDay          Int              // Day of the month (1-31)
+  status          String           @default("ACTIVE") // ACTIVE, CLOSED
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  interestRecords InterestRecord[]
+  payments        Payment[]
+}
+
+model InterestRecord {
+  id          Int                 @id @default(autoincrement())
+  loanId      Int
+  loan        Loan                @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  dueDate     DateTime
+  periodName  String              // e.g. "April 2026"
+  amount      Float               // Monthly interest amount expected
+  paidAmount  Float               @default(0)
+  status      String              @default("PENDING") // PENDING, PARTIALLY_PAID, PAID
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  allocations PaymentAllocation[]
+
+  @@unique([loanId, dueDate])
+}
+
+model Payment {
+  id          Int                 @id @default(autoincrement())
+  borrowerId  Int
+  borrower    Borrower            @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  loanId      Int?
+  loan        Loan?               @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  amount      Float               // Total payment amount entered
+  paymentDate DateTime            @default(now())
+  notes       String?
+  createdAt   DateTime            @default(now())
+  allocations PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id               Int            @id @default(autoincrement())
+  paymentId        Int
+  payment          Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  interestRecordId Int
+  interestRecord   InterestRecord @relation(fields: [interestRecordId], references: [id], onDelete: Cascade)
+  amount           Float          // Amount allocated to this monthly interest record
+  createdAt        DateTime       @default(now())
+}

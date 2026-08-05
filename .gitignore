@@ -1,0 +1,33 @@
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+*.env
+backend/.env
+frontend/.env
+!.env.example
+!backend/.env.example
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Database & temporary files
+*.sqlite
+*.sqlite-journal
