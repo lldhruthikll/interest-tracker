@@ -6,7 +6,7 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend requests
+// Enable CORS for frontend requests  |||
 app.use(
   cors({
     origin: '*', // Allows Render/Vercel connections
@@ -38,3 +38,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Interest Manager Backend API running on port ${PORT}`);
 });
+
+
