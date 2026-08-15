@@ -40,6 +40,8 @@ router.put('/interest-records/:id/clear', loanController.clearInterestRecord);
 // Payments (FIFO)
 router.post('/payments', paymentController.recordPayment);
 router.get('/payments', paymentController.getPaymentHistory);
+router.put('/payments/:id', paymentController.updatePayment);
+router.delete('/payments/:id', paymentController.deletePayment);
 
 // Reports
 router.get('/reports/excel', reportController.exportExcelReport);

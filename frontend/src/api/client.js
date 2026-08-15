@@ -67,6 +67,9 @@ export const api = {
   recordPayment: (data) =>
     apiFetch('/payments', { method: 'POST', body: JSON.stringify(data) }),
   getPayments: (params = '') => apiFetch(`/payments${params}`),
+  updatePayment: (id, data) =>
+    apiFetch(`/payments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePayment: (id) => apiFetch(`/payments/${id}`, { method: 'DELETE' }),
 
   downloadExcelReport: async () => {
     const blob = await apiFetch('/reports/excel');

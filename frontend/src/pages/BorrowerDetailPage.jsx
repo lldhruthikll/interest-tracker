@@ -32,6 +32,7 @@ export default function BorrowerDetailPage() {
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [loanToEdit, setLoanToEdit] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentToEdit, setPaymentToEdit] = useState(null);
   const [isEditBorrowerModalOpen, setIsEditBorrowerModalOpen] = useState(false);
 
   const fetchBorrowerDetail = async () => {
@@ -89,6 +90,22 @@ export default function BorrowerDetailPage() {
         alert('Failed to delete loan: ' + err.message);
       }
     }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (window.confirm('Are you sure you want to delete this payment? Interest records will be reverted.')) {
+      try {
+        await api.deletePayment(paymentId);
+        fetchBorrowerDetail();
+      } catch (err) {
+        alert('Failed to delete payment: ' + err.message);
+      }
+    }
+  };
+
+  const handleEditPayment = (payment) => {
+    setPaymentToEdit(payment);
+    setIsPaymentModalOpen(true);
   };
 
   const handleClearInterestRecord = async (record) => {
@@ -449,6 +466,7 @@ export default function BorrowerDetailPage() {
                   <th className="pb-2 font-bold uppercase">Amount Paid</th>
                   <th className="pb-2 font-bold uppercase">Allocated Periods (FIFO)</th>
                   <th className="pb-2 font-bold uppercase">Notes</th>
+                  <th className="pb-2 font-bold uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
@@ -470,6 +488,24 @@ export default function BorrowerDetailPage() {
                         {periodsText || 'General Payment'}
                       </td>
                       <td className="py-3 text-slate-500">{p.notes || '-'}</td>
+                      <td className="py-3">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleEditPayment(p)}
+                            title="Edit Payment"
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/10 text-slate-400 hover:text-amber-400 border border-slate-700 hover:border-amber-500/30 transition-colors"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePayment(p.id)}
+                            title="Delete Payment"
+                            className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -494,9 +530,13 @@ export default function BorrowerDetailPage() {
 
       <PaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPaymentToEdit(null);
+        }}
         onSuccess={fetchBorrowerDetail}
         initialBorrowerId={borrower.id}
+        paymentToEdit={paymentToEdit}
       />
 
       <BorrowerFormModal

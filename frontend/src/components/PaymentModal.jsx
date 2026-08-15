@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, IndianRupee, Info } from 'lucide-react';
+import { X, IndianRupee, Info, Edit } from 'lucide-react';
 import { api } from '../api/client';
 
-export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrowerId = null }) {
+export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrowerId = null, paymentToEdit = null }) {
+  const isEditMode = Boolean(paymentToEdit);
+
   const [borrowers, setBorrowers] = useState([]);
   const [selectedBorrowerId, setSelectedBorrowerId] = useState(initialBorrowerId || '');
   const [loans, setLoans] = useState([]);
@@ -15,19 +17,32 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
 
   useEffect(() => {
     if (isOpen) {
-      api.getBorrowers().then((data) => {
-        setBorrowers(data);
-        if (initialBorrowerId) {
-          setSelectedBorrowerId(initialBorrowerId);
-        } else if (data.length > 0) {
-          setSelectedBorrowerId(data[0].id);
-        }
-      });
+      if (isEditMode) {
+        // Pre-fill from existing payment
+        setAmount(paymentToEdit.amount || '');
+        setNotes(paymentToEdit.notes || '');
+        setPaymentDate(
+          paymentToEdit.paymentDate
+            ? new Date(paymentToEdit.paymentDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
+        setSelectedBorrowerId(paymentToEdit.borrowerId || '');
+        setSelectedLoanId(paymentToEdit.loanId || '');
+      } else {
+        api.getBorrowers().then((data) => {
+          setBorrowers(data);
+          if (initialBorrowerId) {
+            setSelectedBorrowerId(initialBorrowerId);
+          } else if (data.length > 0) {
+            setSelectedBorrowerId(data[0].id);
+          }
+        });
+      }
     }
-  }, [isOpen, initialBorrowerId]);
+  }, [isOpen, initialBorrowerId, isEditMode, paymentToEdit]);
 
   useEffect(() => {
-    if (selectedBorrowerId) {
+    if (selectedBorrowerId && !isEditMode) {
       api.getBorrowerById(selectedBorrowerId).then((borrower) => {
         setLoans(borrower.loans || []);
         setSelectedLoanId('');
@@ -35,7 +50,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
     } else {
       setLoans([]);
     }
-  }, [selectedBorrowerId]);
+  }, [selectedBorrowerId, isEditMode]);
 
   if (!isOpen) return null;
 
@@ -43,27 +58,40 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
     e.preventDefault();
     setError('');
 
-    if (!selectedBorrowerId || !amount || Number(amount) <= 0) {
-      setError('Please select a borrower and enter a valid positive amount');
+    if (!amount || Number(amount) <= 0) {
+      setError('Please enter a valid positive amount');
       return;
     }
 
     try {
       setSubmitting(true);
-      await api.recordPayment({
-        borrowerId: Number(selectedBorrowerId),
-        loanId: selectedLoanId ? Number(selectedLoanId) : null,
-        amount: Number(amount),
-        notes,
-        paymentDate,
-      });
+
+      if (isEditMode) {
+        await api.updatePayment(paymentToEdit.id, {
+          amount: Number(amount),
+          notes,
+          paymentDate,
+        });
+      } else {
+        if (!selectedBorrowerId) {
+          setError('Please select a borrower');
+          return;
+        }
+        await api.recordPayment({
+          borrowerId: Number(selectedBorrowerId),
+          loanId: selectedLoanId ? Number(selectedLoanId) : null,
+          amount: Number(amount),
+          notes,
+          paymentDate,
+        });
+      }
 
       onSuccess();
       onClose();
       setAmount('');
       setNotes('');
     } catch (err) {
-      setError(err.message || 'Failed to record payment');
+      setError(err.message || 'Failed to save payment');
     } finally {
       setSubmitting(false);
     }
@@ -77,10 +105,12 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <IndianRupee className="w-5 h-5" />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEditMode ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'}`}>
+              {isEditMode ? <Edit className="w-5 h-5" /> : <IndianRupee className="w-5 h-5" />}
             </div>
-            <h3 className="text-lg font-bold text-slate-100">Record Payment</h3>
+            <h3 className="text-lg font-bold text-slate-100">
+              {isEditMode ? 'Edit Payment' : 'Record Payment'}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -98,36 +128,48 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
             </div>
           )}
 
-          {/* FIFO Explanation Notice */}
-          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-start space-x-3 text-xs text-cyan-300">
-            <Info className="w-4 h-4 shrink-0 text-cyan-400 mt-0.5" />
-            <span>
-              <strong>FIFO Payment Allocation:</strong> Payment will automatically pay off the oldest pending monthly interest records first (April $\rightarrow$ May $\rightarrow$ June).
-            </span>
-          </div>
+          {isEditMode ? (
+            /* Edit mode: show locked info banner */
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start space-x-3 text-xs text-amber-300">
+              <Info className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              <span>
+                <strong>Editing payment:</strong> Changing the amount will automatically reverse and redo the FIFO interest allocation.
+              </span>
+            </div>
+          ) : (
+            /* Create mode: FIFO notice */
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-start space-x-3 text-xs text-cyan-300">
+              <Info className="w-4 h-4 shrink-0 text-cyan-400 mt-0.5" />
+              <span>
+                <strong>FIFO Payment Allocation:</strong> Payment will automatically pay off the oldest pending monthly interest records first.
+              </span>
+            </div>
+          )}
 
-          {/* Borrower Selector */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
-              Borrower *
-            </label>
-            <select
-              value={selectedBorrowerId}
-              onChange={(e) => setSelectedBorrowerId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
-              required
-            >
-              <option value="">Select Borrower</option>
-              {borrowers.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.phone}) {b.totalPendingInterest > 0 ? `- Pending: ₹${b.totalPendingInterest}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Borrower Selector — only in create mode */}
+          {!isEditMode && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+                Borrower *
+              </label>
+              <select
+                value={selectedBorrowerId}
+                onChange={(e) => setSelectedBorrowerId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
+                required
+              >
+                <option value="">Select Borrower</option>
+                {borrowers.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.phone}) {b.totalPendingInterest > 0 ? `- Pending: ₹${b.totalPendingInterest}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {/* Optional Specific Loan Selector */}
-          {loans.length > 0 && (
+          {/* Optional Specific Loan Selector — only in create mode */}
+          {!isEditMode && loans.length > 0 && (
             <div>
               <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
                 Loan (Optional - Auto distributes if left empty)
@@ -205,9 +247,11 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/20 transition-all"
+              className={`px-5 py-2 rounded-xl text-white text-sm font-bold shadow-lg transition-all ${isEditMode ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'}`}
             >
-              {submitting ? 'Recording...' : 'Submit Payment'}
+              {submitting
+                ? isEditMode ? 'Saving...' : 'Recording...'
+                : isEditMode ? 'Save Changes' : 'Submit Payment'}
             </button>
           </div>
         </form>
@@ -215,3 +259,4 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, initialBorrow
     </div>
   );
 }
+
