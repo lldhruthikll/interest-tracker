@@ -21,6 +21,9 @@ router.get('/auth/profile', authController.getProfile);
 // Dashboard
 router.get('/dashboard', dashboardController.getDashboardStats);
 
+// Analytics
+router.get('/analytics/monthly', dashboardController.getMonthlyAnalytics);
+
 // Borrowers
 router.get('/borrowers', borrowerController.getBorrowers);
 router.get('/borrowers/:id', borrowerController.getBorrowerById);

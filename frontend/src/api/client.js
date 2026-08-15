@@ -44,6 +44,10 @@ export const api = {
 
   getDashboard: () => apiFetch('/dashboard'),
 
+  getMonthlyAnalytics: (year, month) =>
+    apiFetch(`/analytics/monthly?year=${year}${month ? `&month=${month}` : ''}`),
+
+
   getBorrowers: (search = '') =>
     apiFetch(`/borrowers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   getBorrowerById: (id) => apiFetch(`/borrowers/${id}`),

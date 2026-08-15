@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import StatCard from '../components/StatCard';
 import NotificationBanner from '../components/NotificationBanner';
@@ -12,10 +12,11 @@ import {
   TrendingUp,
   Landmark,
   Search,
-  Plus,
   UserPlus,
   ArrowUpRight,
   Phone,
+  BarChart2,
+  ChevronDown,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -28,6 +29,25 @@ export default function DashboardPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isBorrowerModalOpen, setIsBorrowerModalOpen] = useState(false);
   const [selectedBorrowerForPayment, setSelectedBorrowerForPayment] = useState(null);
+
+  // --- Analytics state ---
+  const now = new Date();
+  const [analyticsYear, setAnalyticsYear] = useState(now.getFullYear());
+  const [analyticsMonth, setAnalyticsMonth] = useState(now.getMonth() + 1);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  const fetchAnalytics = useCallback(async (year, month) => {
+    try {
+      setAnalyticsLoading(true);
+      const data = await api.getMonthlyAnalytics(year, month);
+      setAnalyticsData(data);
+    } catch (err) {
+      console.error('Analytics error:', err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -44,6 +64,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    fetchAnalytics(analyticsYear, analyticsMonth);
+  }, [analyticsYear, analyticsMonth, fetchAnalytics]);
 
   if (loading) {
     return (
@@ -338,6 +362,16 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* ── Analytics Section ── */}
+      <AnalyticsSection
+        analyticsData={analyticsData}
+        analyticsLoading={analyticsLoading}
+        analyticsYear={analyticsYear}
+        analyticsMonth={analyticsMonth}
+        onYearChange={setAnalyticsYear}
+        onMonthChange={setAnalyticsMonth}
+      />
+
       {/* Modals */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
@@ -351,6 +385,259 @@ export default function DashboardPage() {
         onClose={() => setIsBorrowerModalOpen(false)}
         onSuccess={fetchDashboardData}
       />
+    </div>
+  );
+}
+
+// ─── Analytics Section Component ───────────────────────────────────────────
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+
+function AnalyticsSection({
+  analyticsData, analyticsLoading,
+  analyticsYear, analyticsMonth,
+  onYearChange, onMonthChange,
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+
+  const { monthlyTrend = [], selectedMonthSummary = {}, borrowerBreakdown = [] } =
+    analyticsData || {};
+
+  // SVG Bar Chart dimensions
+  const chartW = 600;
+  const chartH = 140;
+  const barGap = 6;
+  const barCount = monthlyTrend.length;
+  const barW = barCount > 0 ? (chartW - barGap * (barCount + 1)) / barCount : 30;
+  const maxVal = Math.max(...monthlyTrend.map((m) => m.totalExpected), 1);
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+      {/* Header + Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h3 className="text-sm font-extrabold text-slate-100 flex items-center">
+          <BarChart2 className="w-4 h-4 mr-2 text-violet-400" />
+          Monthly Interest Analytics
+        </h3>
+        <div className="flex items-center gap-2">
+          {/* Month Selector */}
+          <div className="relative">
+            <select
+              value={analyticsMonth}
+              onChange={(e) => onMonthChange(parseInt(e.target.value))}
+              className="appearance-none bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg pl-3 pr-7 py-2 focus:outline-none focus:border-violet-500 cursor-pointer"
+            >
+              {MONTHS.map((name, i) => (
+                <option key={i} value={i + 1}>{name}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3 h-3 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
+          </div>
+          {/* Year Selector */}
+          <div className="relative">
+            <select
+              value={analyticsYear}
+              onChange={(e) => onYearChange(parseInt(e.target.value))}
+              className="appearance-none bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg pl-3 pr-7 py-2 focus:outline-none focus:border-violet-500 cursor-pointer"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3 h-3 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
+      {analyticsLoading ? (
+        <div className="flex items-center justify-center h-32 text-slate-400 text-xs">
+          <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full mr-2" />
+          Loading analytics...
+        </div>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Expected</p>
+              <p className="text-lg font-black text-slate-100">
+                ₹{(selectedMonthSummary.totalExpected || 0).toLocaleString('en-IN')}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {selectedMonthSummary.totalRecords || 0} records
+              </p>
+            </div>
+            <div className="bg-emerald-950/40 border border-emerald-500/20 rounded-xl p-4 text-center">
+              <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-1">Collected</p>
+              <p className="text-lg font-black text-emerald-400">
+                ₹{(selectedMonthSummary.totalCollected || 0).toLocaleString('en-IN')}
+              </p>
+              <p className="text-[10px] text-emerald-600 mt-0.5">
+                {selectedMonthSummary.totalExpected
+                  ? `${Math.round((selectedMonthSummary.totalCollected / selectedMonthSummary.totalExpected) * 100)}% collected`
+                  : '0% collected'}
+              </p>
+            </div>
+            <div className="bg-rose-950/30 border border-rose-500/20 rounded-xl p-4 text-center">
+              <p className="text-[10px] text-rose-400 uppercase tracking-widest mb-1">Pending</p>
+              <p className="text-lg font-black text-rose-400">
+                ₹{(selectedMonthSummary.totalPending || 0).toLocaleString('en-IN')}
+              </p>
+              <p className="text-[10px] text-rose-600 mt-0.5">
+                {selectedMonthSummary.totalExpected
+                  ? `${Math.round((selectedMonthSummary.totalPending / selectedMonthSummary.totalExpected) * 100)}% outstanding`
+                  : '—'}
+              </p>
+            </div>
+          </div>
+
+          {/* 12-Month SVG Bar Chart */}
+          {monthlyTrend.length > 0 && (
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">12-Month Trend</p>
+              <div className="w-full overflow-x-auto">
+                <svg
+                  viewBox={`0 0 ${chartW} ${chartH + 30}`}
+                  className="w-full min-w-[400px]"
+                  style={{ height: 180 }}
+                >
+                  {/* Grid lines */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((frac) => (
+                    <line
+                      key={frac}
+                      x1={0} y1={chartH - frac * chartH}
+                      x2={chartW} y2={chartH - frac * chartH}
+                      stroke="#1e293b" strokeWidth={1}
+                    />
+                  ))}
+
+                  {monthlyTrend.map((m, i) => {
+                    const x = barGap + i * (barW + barGap);
+                    const expectedH = (m.totalExpected / maxVal) * chartH;
+                    const collectedH = (m.totalCollected / maxVal) * chartH;
+                    const isSelected =
+                      m.month === analyticsMonth && m.year === analyticsYear;
+
+                    return (
+                      <g key={i}>
+                        {/* Expected bar (background) */}
+                        <rect
+                          x={x}
+                          y={chartH - expectedH}
+                          width={barW}
+                          height={expectedH}
+                          rx={3}
+                          fill={isSelected ? '#6d28d9' : '#334155'}
+                          opacity={0.7}
+                        />
+                        {/* Collected bar (foreground) */}
+                        <rect
+                          x={x}
+                          y={chartH - collectedH}
+                          width={barW}
+                          height={collectedH}
+                          rx={3}
+                          fill={isSelected ? '#10b981' : '#0f766e'}
+                          opacity={0.9}
+                        />
+                        {/* Month label */}
+                        <text
+                          x={x + barW / 2}
+                          y={chartH + 16}
+                          textAnchor="middle"
+                          fontSize={9}
+                          fill={isSelected ? '#a78bfa' : '#64748b'}
+                          fontWeight={isSelected ? '700' : '400'}
+                        >
+                          {m.label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+              <div className="flex items-center gap-5 mt-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-slate-600 opacity-70" />
+                  <span className="text-[10px] text-slate-500">Expected</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm bg-teal-700" />
+                  <span className="text-[10px] text-slate-500">Collected</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Per-Borrower Breakdown */}
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">
+              Borrower Breakdown — {MONTHS[analyticsMonth - 1]} {analyticsYear}
+            </p>
+            {borrowerBreakdown.length === 0 ? (
+              <div className="text-center py-6 text-xs text-slate-500">
+                No interest records for this month.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="pb-2.5 text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Borrower</th>
+                      <th className="pb-2.5 text-[10px] uppercase tracking-widest text-slate-500 font-semibold text-right">Expected</th>
+                      <th className="pb-2.5 text-[10px] uppercase tracking-widest text-slate-500 font-semibold text-right">Collected</th>
+                      <th className="pb-2.5 text-[10px] uppercase tracking-widest text-slate-500 font-semibold text-right">Pending</th>
+                      <th className="pb-2.5 text-[10px] uppercase tracking-widest text-slate-500 font-semibold text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {borrowerBreakdown.map((b) => {
+                      const pct = b.totalExpected > 0
+                        ? Math.round((b.totalCollected / b.totalExpected) * 100)
+                        : 0;
+                      const statusLabel =
+                        pct >= 100 ? 'PAID' : pct > 0 ? 'PARTIAL' : 'PENDING';
+                      const statusColor =
+                        pct >= 100
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                          : pct > 0
+                          ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                          : 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+
+                      return (
+                        <tr key={b.borrowerId} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-2.5 pr-4">
+                            <ArrowUpRight className="w-3 h-3 inline mr-1 text-slate-600" />
+                            <span className="font-semibold text-slate-200">{b.borrowerName}</span>
+                            <span className="ml-2 text-slate-500">{b.phone}</span>
+                          </td>
+                          <td className="py-2.5 text-right text-slate-300 font-mono">
+                            ₹{b.totalExpected.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-2.5 text-right text-emerald-400 font-mono font-semibold">
+                            ₹{b.totalCollected.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-2.5 text-right text-rose-400 font-mono font-semibold">
+                            ₹{b.totalPending.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${statusColor}`}>
+                              {statusLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
