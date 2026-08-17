@@ -6,15 +6,16 @@ async function getDashboardStats(req, res) {
     // Sync all active loans before compiling dashboard metrics
     await syncAllActiveLoans();
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use UTC-based date strings for stable timezone-independent comparisons.
+    // Prisma/Postgres stores dueDate as UTC midnight; comparing via toISOString()
+    // avoids timezone-shift bugs where a date near midnight shifts to the wrong day.
+    const nowUtc = new Date();
+    const todayStr = nowUtc.toISOString().split('T')[0]; // e.g. '2026-08-17'
 
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
-
-    const sevenDaysFromNow = new Date(today);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    sevenDaysFromNow.setHours(23, 59, 59, 999);
+    // Calculate the date string 7 days from today
+    const sevenDaysLater = new Date(nowUtc);
+    sevenDaysLater.setUTCDate(sevenDaysLater.getUTCDate() + 7);
+    const sevenDaysLaterStr = sevenDaysLater.toISOString().split('T')[0];
 
     // Fetch active loans with borrower and interest records
     const activeLoans = await prisma.loan.findMany({
@@ -44,14 +45,14 @@ async function getDashboardStats(req, res) {
 
       for (const record of loan.interestRecords) {
         const pendingAmount = record.amount - record.paidAmount;
-        const recordDate = new Date(record.dueDate);
-        recordDate.setHours(0, 0, 0, 0);
+        // Get the date string in UTC (matches how Prisma stores the date)
+        const recordDateStr = new Date(record.dueDate).toISOString().split('T')[0];
 
         if (pendingAmount > 0) {
           totalPendingInterest += pendingAmount;
         }
 
-        // Calendar event metadata
+        // Calendar event metadata (include all records for the calendar view)
         calendarEvents.push({
           id: record.id,
           title: `${loan.borrower.name} - ₹${record.amount}`,
@@ -66,7 +67,7 @@ async function getDashboardStats(req, res) {
         });
 
         // Check if Due Today
-        if (recordDate.getTime() === today.getTime() && pendingAmount > 0) {
+        if (recordDateStr === todayStr && pendingAmount > 0) {
           todaysDueAmount += pendingAmount;
           todaysDueCount++;
           todaysDueList.push({
@@ -82,8 +83,11 @@ async function getDashboardStats(req, res) {
           });
         }
 
-        // Check if Overdue (Due date is before today and has pending balance)
-        if (recordDate < today && pendingAmount > 0) {
+        // Check if Overdue (due date is before today and has a pending balance)
+        if (recordDateStr < todayStr && pendingAmount > 0) {
+          const dayDiff = Math.floor(
+            (new Date(todayStr) - new Date(recordDateStr)) / (1000 * 60 * 60 * 24)
+          );
           overdueList.push({
             recordId: record.id,
             borrowerId: loan.borrower.id,
@@ -94,12 +98,12 @@ async function getDashboardStats(req, res) {
             amount: record.amount,
             pendingAmount: pendingAmount,
             periodName: record.periodName,
-            daysOverdue: Math.floor((today - recordDate) / (1000 * 60 * 60 * 24)),
+            daysOverdue: dayDiff,
           });
         }
 
-        // Check if Upcoming (Due date is within next 7 days, excluding today)
-        if (recordDate > today && recordDate <= sevenDaysFromNow && pendingAmount > 0) {
+        // Check if Upcoming: due date is after today and within the next 7 days, with a pending balance
+        if (recordDateStr > todayStr && recordDateStr <= sevenDaysLaterStr && pendingAmount > 0) {
           upcomingList.push({
             recordId: record.id,
             borrowerId: loan.borrower.id,

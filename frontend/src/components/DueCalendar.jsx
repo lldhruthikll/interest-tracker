@@ -23,12 +23,15 @@ export default function DueCalendar({ events = [] }) {
     setCurrentMonth(new Date(year, month + 1, 1));
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayLocal = new Date();
+  const todayStr = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-${String(todayLocal.getDate()).padStart(2, '0')}`;
 
-  // Group events by YYYY-MM-DD
+  // Group events by local YYYY-MM-DD (consistent with calendar grid which uses local year/month/day)
   const eventsByDate = new Map();
   events.forEach((evt) => {
-    const dStr = new Date(evt.dueDate).toISOString().split('T')[0];
+    const d = new Date(evt.dueDate);
+    // Use local date parts so the grouping matches the calendar grid date strings
+    const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (!eventsByDate.has(dStr)) {
       eventsByDate.set(dStr, []);
     }
@@ -129,7 +132,7 @@ export default function DueCalendar({ events = [] }) {
               <div className="space-y-1 overflow-y-auto max-h-16 pr-1">
                 {dayEvents.map((evt) => {
                   const isPaid = evt.status === 'PAID';
-                  const isOverdue = !isPaid && new Date(evt.dueDate) < new Date(todayStr);
+                  const isOverdue = !isPaid && dateStr < todayStr;
 
                   let badgeColor = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
                   if (isPaid) badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';

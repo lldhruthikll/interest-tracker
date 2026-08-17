@@ -16,12 +16,20 @@ function getDueDatesForLoan(startDate, targetDate = new Date()) {
   // Normalise target to end of day to include due dates on target day
   target.setHours(23, 59, 59, 999);
 
+  // JavaScript months are 0-indexed in new Date(year, month, day).
+  // start.getMonth() + 1 gives the *next* month in 0-indexed terms, which is the first due month.
   let year = start.getFullYear();
-  let month = start.getMonth() + 1; // Month after start date is the first due date month
+  let month = start.getMonth() + 1; // e.g. start in Aug (7) → month=8 (Sep)
   const targetDay = start.getDate();
 
+  // Handle December start: month becomes 12, which wraps to January of the next year
+  if (month > 11) {
+    month = 0;
+    year++;
+  }
+
   while (true) {
-    // Calculate last day of the target month to handle months with fewer days (e.g. Feb)
+    // new Date(year, month+1, 0) gives the last day of `month` (0-indexed)
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
     const actualDay = Math.min(targetDay, lastDayOfMonth);
     const dueDate = new Date(year, month, actualDay, 0, 0, 0, 0);
