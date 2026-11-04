@@ -1,4 +1,3 @@
-const prisma = require('../config/db');
 const { toPaise, fromPaise } = require('../lib/money');
 const { todayIST, toDateOnly, toDbDate, periodOf, addMonths, clampDay } = require('../lib/dates');
 const { planFifo } = require('./allocation');
@@ -24,9 +23,9 @@ function getDueDatesForLoan(startDateStr, targetDateStr = todayIST()) {
 }
 
 /**
- * Synchronises interest records for a specific loan up to today (IST).
+ * Synchronises interest records for a specific loan up to today (IST). db: forOwner(...) client or its tx.
  */
-async function syncLoanInterestRecords(loanId, db = prisma) {
+async function syncLoanInterestRecords(db, loanId) {
   const loan = await db.loan.findUnique({
     where: { id: Number(loanId) },
     include: { interestRecords: true },
@@ -42,7 +41,6 @@ async function syncLoanInterestRecords(loanId, db = prisma) {
     if (existing.has(due)) continue;
     await db.interestRecord.create({
       data: {
-        ownerId: loan.ownerId,
         loanId: loan.id,
         dueDate: toDbDate(due),
         periodName: `${MONTH_NAMES[Number(due.slice(5, 7)) - 1]} ${due.slice(0, 4)}`,
@@ -57,13 +55,13 @@ async function syncLoanInterestRecords(loanId, db = prisma) {
 /**
  * Synchronises interest records for all active loans.
  */
-async function syncAllActiveLoans(db = prisma) {
+async function syncAllActiveLoans(db) {
   const activeLoans = await db.loan.findMany({
     where: { status: 'ACTIVE' },
   });
 
   for (const loan of activeLoans) {
-    await syncLoanInterestRecords(loan.id, db);
+    await syncLoanInterestRecords(db, loan.id);
   }
 }
 
@@ -71,13 +69,13 @@ async function syncAllActiveLoans(db = prisma) {
  * Syncs dues, then allocates amountPaise of an existing payment FIFO (oldest due first).
  * Must run inside a transaction (tx). Returns { allocations, leftoverPaise }.
  */
-async function applyPaymentFIFO(tx, { paymentId, ownerId, borrowerId, loanId, amountPaise }) {
+async function applyPaymentFIFO(tx, { paymentId, borrowerId, loanId, amountPaise }) {
   if (loanId) {
-    await syncLoanInterestRecords(loanId, tx);
+    await syncLoanInterestRecords(tx, loanId);
   } else {
     const loans = await tx.loan.findMany({ where: { borrowerId, status: 'ACTIVE' } });
     for (const l of loans) {
-      await syncLoanInterestRecords(l.id, tx);
+      await syncLoanInterestRecords(tx, l.id);
     }
   }
 
@@ -107,7 +105,7 @@ async function applyPaymentFIFO(tx, { paymentId, ownerId, borrowerId, loanId, am
       },
     });
     allocations.push(await tx.paymentAllocation.create({
-      data: { ownerId, paymentId, interestRecordId: dueId, amount: fromPaise(allocated) },
+      data: { paymentId, interestRecordId: dueId, amount: fromPaise(allocated) },
     }));
   }
 
@@ -117,11 +115,10 @@ async function applyPaymentFIFO(tx, { paymentId, ownerId, borrowerId, loanId, am
 /**
  * Records a payment and allocates it to the oldest pending interest records first (FIFO).
  */
-async function allocatePaymentFIFO({ ownerId, borrowerId, loanId, amountPaise, notes, paymentDate = new Date() }) {
-  return await prisma.$transaction(async (tx) => {
+async function allocatePaymentFIFO(db, { borrowerId, loanId, amountPaise, notes, paymentDate = new Date() }) {
+  return await db.$transaction(async (tx) => {
     const payment = await tx.payment.create({
       data: {
-        ownerId,
         borrowerId,
         loanId: loanId || null,
         amount: fromPaise(amountPaise),
@@ -131,7 +128,7 @@ async function allocatePaymentFIFO({ ownerId, borrowerId, loanId, amountPaise, n
     });
 
     const { allocations, leftoverPaise } = await applyPaymentFIFO(tx, {
-      paymentId: payment.id, ownerId, borrowerId, loanId, amountPaise,
+      paymentId: payment.id, borrowerId, loanId, amountPaise,
     });
 
     return {

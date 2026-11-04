@@ -1,71 +1,62 @@
-const prisma = require('../config/db');
 const { allocatePaymentFIFO, applyPaymentFIFO } = require('../services/interestService');
 const { toPaise, fromPaise, parseAmountPaise } = require('../lib/money');
-const { HttpError } = require('../lib/errors');
+const { ValidationError, parseId } = require('../lib/errors');
+const { requireOwned } = require('../lib/ownerDb');
 
 async function recordPayment(req, res) {
-  try {
-    const { borrowerId, loanId, amount, notes, paymentDate } = req.body;
+  const { borrowerId, loanId, amount, notes, paymentDate } = req.body;
 
-    if (!borrowerId || !amount) {
-      return res.status(400).json({ error: 'Borrower ID and Amount are required' });
-    }
+  if (!borrowerId || !amount) throw new ValidationError('Borrower ID and Amount are required');
+  const amountPaise = parseAmountPaise(amount);
 
-    const result = await allocatePaymentFIFO({
-      ownerId: req.user.id,
-      borrowerId: Number(borrowerId),
-      loanId: loanId ? Number(loanId) : null,
-      amountPaise: parseAmountPaise(amount),
-      notes,
-      paymentDate: paymentDate || new Date(),
-    });
+  const borrower = await requireOwned(req.db, 'borrower', parseId(borrowerId));
+  const loan = loanId ? await requireOwned(req.db, 'loan', parseId(loanId)) : null;
+  if (loan && loan.borrowerId !== borrower.id) throw new ValidationError('Loan does not belong to this borrower');
 
-    return res.status(201).json({
-      message: 'Payment recorded and allocated successfully',
-      payment: result.payment,
-      allocatedRecordsCount: result.allocations.length,
-      remainingUnallocatedPayment: result.remainingPayment,
-    });
-  } catch (error) {
-    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error('Error recording payment:', error);
-    return res.status(500).json({ error: error.message || 'Failed to record payment' });
-  }
+  const result = await allocatePaymentFIFO(req.db, {
+    borrowerId: borrower.id,
+    loanId: loan ? loan.id : null,
+    amountPaise,
+    notes,
+    paymentDate: paymentDate || new Date(),
+  });
+
+  return res.status(201).json({
+    message: 'Payment recorded and allocated successfully',
+    payment: result.payment,
+    allocatedRecordsCount: result.allocations.length,
+    remainingUnallocatedPayment: result.remainingPayment,
+  });
 }
 
 async function getPaymentHistory(req, res) {
-  try {
-    const { borrowerId, loanId } = req.query;
+  const { borrowerId, loanId } = req.query;
 
-    const where = {};
-    if (borrowerId) where.borrowerId = Number(borrowerId);
-    if (loanId) where.loanId = Number(loanId);
+  const where = {};
+  if (borrowerId) where.borrowerId = parseId(borrowerId);
+  if (loanId) where.loanId = parseId(loanId);
 
-    const payments = await prisma.payment.findMany({
-      where,
-      orderBy: { paymentDate: 'desc' },
-      include: {
-        borrower: {
-          select: { name: true, phone: true },
-        },
-        loan: {
-          select: { principal: true, monthlyInterest: true },
-        },
-        allocations: {
-          include: {
-            interestRecord: {
-              select: { periodName: true, dueDate: true, amount: true },
-            },
+  const payments = await req.db.payment.findMany({
+    where,
+    orderBy: { paymentDate: 'desc' },
+    include: {
+      borrower: {
+        select: { name: true, phone: true },
+      },
+      loan: {
+        select: { principal: true, monthlyInterest: true },
+      },
+      allocations: {
+        include: {
+          interestRecord: {
+            select: { periodName: true, dueDate: true, amount: true },
           },
         },
       },
-    });
+    },
+  });
 
-    return res.json(payments);
-  } catch (error) {
-    console.error('Error fetching payment history:', error);
-    return res.status(500).json({ error: 'Failed to fetch payment history' });
-  }
+  return res.json(payments);
 }
 
 /**
@@ -74,7 +65,7 @@ async function getPaymentHistory(req, res) {
  */
 async function reversePaymentAllocations(paymentId, tx) {
   const allocations = await tx.paymentAllocation.findMany({
-    where: { paymentId: Number(paymentId) },
+    where: { paymentId },
   });
 
   for (const alloc of allocations) {
@@ -82,7 +73,7 @@ async function reversePaymentAllocations(paymentId, tx) {
     const otherAllocations = await tx.paymentAllocation.findMany({
       where: {
         interestRecordId: alloc.interestRecordId,
-        paymentId: { not: Number(paymentId) },
+        paymentId: { not: paymentId },
       },
     });
 
@@ -110,66 +101,45 @@ async function reversePaymentAllocations(paymentId, tx) {
 }
 
 async function deletePayment(req, res) {
-  try {
-    const { id } = req.params;
+  const id = parseId(req.params.id);
 
-    const payment = await prisma.payment.findUnique({ where: { id: Number(id) } });
-    if (!payment) {
-      return res.status(404).json({ error: 'Payment not found' });
-    }
+  await req.db.$transaction(async (tx) => {
+    await requireOwned(tx, 'payment', id);
+    await reversePaymentAllocations(id, tx);
+    // PaymentAllocation rows cascade-delete when payment is deleted
+    await tx.payment.delete({ where: { id } });
+  });
 
-    await prisma.$transaction(async (tx) => {
-      await reversePaymentAllocations(id, tx);
-      // PaymentAllocation rows cascade-delete when payment is deleted
-      await tx.payment.delete({ where: { id: Number(id) } });
-    });
-
-    return res.json({ message: 'Payment deleted and interest records reverted successfully' });
-  } catch (error) {
-    console.error('Error deleting payment:', error);
-    return res.status(500).json({ error: error.message || 'Failed to delete payment' });
-  }
+  return res.json({ message: 'Payment deleted and interest records reverted successfully' });
 }
 
 async function updatePayment(req, res) {
-  try {
-    const { id } = req.params;
-    const { amount, notes, paymentDate } = req.body;
+  const id = parseId(req.params.id);
+  const { amount, notes, paymentDate } = req.body;
+  const amountPaise = parseAmountPaise(amount);
 
-    const payment = await prisma.payment.findUnique({ where: { id: Number(id) } });
-    if (!payment) {
-      return res.status(404).json({ error: 'Payment not found' });
-    }
-
-    const amountPaise = parseAmountPaise(amount);
-
-    // Reverse old allocations, update the payment, then re-run FIFO, all in one transaction.
-    await prisma.$transaction(async (tx) => {
-      await reversePaymentAllocations(id, tx);
-      await tx.paymentAllocation.deleteMany({ where: { paymentId: Number(id) } });
-      await tx.payment.update({
-        where: { id: Number(id) },
-        data: {
-          amount: fromPaise(amountPaise),
-          notes: notes !== undefined ? (notes || null) : payment.notes,
-          paymentDate: paymentDate ? new Date(paymentDate) : payment.paymentDate,
-        },
-      });
-      await applyPaymentFIFO(tx, {
-        paymentId: payment.id,
-        ownerId: payment.ownerId,
-        borrowerId: payment.borrowerId,
-        loanId: payment.loanId,
-        amountPaise,
-      });
+  // Reverse old allocations, update the payment, then re-run FIFO, all in one transaction.
+  await req.db.$transaction(async (tx) => {
+    const payment = await requireOwned(tx, 'payment', id);
+    await reversePaymentAllocations(id, tx);
+    await tx.paymentAllocation.deleteMany({ where: { paymentId: id } });
+    await tx.payment.update({
+      where: { id },
+      data: {
+        amount: fromPaise(amountPaise),
+        notes: notes !== undefined ? (notes || null) : payment.notes,
+        paymentDate: paymentDate ? new Date(paymentDate) : payment.paymentDate,
+      },
     });
+    await applyPaymentFIFO(tx, {
+      paymentId: id,
+      borrowerId: payment.borrowerId,
+      loanId: payment.loanId,
+      amountPaise,
+    });
+  });
 
-    return res.json({ message: 'Payment updated and reallocated successfully' });
-  } catch (error) {
-    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error('Error updating payment:', error);
-    return res.status(500).json({ error: error.message || 'Failed to update payment' });
-  }
+  return res.json({ message: 'Payment updated and reallocated successfully' });
 }
 
 module.exports = {

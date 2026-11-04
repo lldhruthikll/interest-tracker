@@ -4,6 +4,9 @@ const prisma = require('../config/db');
 const { JWT_SECRET, loginLimiter } = require('../middleware/auth');
 const { ValidationError, HttpError } = require('../lib/errors');
 
+// Compared against when the user is missing/inactive so response time doesn't reveal account existence.
+const DUMMY_HASH = bcrypt.hashSync('timing-equaliser', 10);
+
 async function login(req, res) {
   const { username, password } = req.body || {};
   if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
@@ -12,7 +15,9 @@ async function login(req, res) {
   if (loginLimiter.blocked(req)) throw new HttpError(429, 'Too many failed attempts, try again later');
 
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.active || !(await bcrypt.compare(password, user.password))) {
+  const usable = user && user.active;
+  const ok = await bcrypt.compare(password, usable ? user.password : DUMMY_HASH);
+  if (!usable || !ok) {
     loginLimiter.fail(req);
     throw new HttpError(401, 'Invalid credentials');
   }

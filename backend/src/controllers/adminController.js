@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/db');
-const { ValidationError, NotFound } = require('../lib/errors');
+const { ValidationError, NotFound, parseId } = require('../lib/errors');
 
 const safe = { id: true, username: true, name: true, role: true, active: true, mustChangePassword: true, createdAt: true };
 const minPw = (p) => {
@@ -23,7 +23,7 @@ async function createMember(req, res) {
 }
 
 async function updateMember(req, res) {
-  const id = Number(req.params.id);
+  const id = parseId(req.params.id);
   const { password, active } = req.body || {};
   const data = {};
   if (password !== undefined) { minPw(password); data.password = await bcrypt.hash(password, 10); data.mustChangePassword = true; }

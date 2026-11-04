@@ -10,6 +10,7 @@ const loanController = require('../controllers/loanController');
 const paymentController = require('../controllers/paymentController');
 const dashboardController = require('../controllers/dashboardController');
 const reportController = require('../controllers/reportController');
+const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
 router.post('/auth/login', wrap(authController.login));
@@ -23,38 +24,39 @@ router.get('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminContr
 router.post('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminController.createMember));
 router.put('/admin/members/:id', authenticate, requireRole('ADMIN'), wrap(adminController.updateMember));
 
-// Owner routes (Task 5 adds requireRole + owner scoping)
-router.use(authenticate, requirePasswordChanged);
+// Owner routes: every query below goes through req.db, pinned to the caller's ownerId.
+const ownerScope = (req, res, next) => { req.db = forOwner(req.user.id); next(); };
+router.use(authenticate, requirePasswordChanged, requireRole('ADMIN', 'MEMBER'), ownerScope);
 
 // Dashboard
-router.get('/dashboard', dashboardController.getDashboardStats);
+router.get('/dashboard', wrap(dashboardController.getDashboardStats));
 
 // Analytics
-router.get('/analytics/monthly', dashboardController.getMonthlyAnalytics);
+router.get('/analytics/monthly', wrap(dashboardController.getMonthlyAnalytics));
 
 // Borrowers
-router.get('/borrowers', borrowerController.getBorrowers);
-router.get('/borrowers/:id', borrowerController.getBorrowerById);
-router.post('/borrowers', borrowerController.createBorrower);
-router.put('/borrowers/:id', borrowerController.updateBorrower);
-router.delete('/borrowers/:id', borrowerController.deleteBorrower);
+router.get('/borrowers', wrap(borrowerController.getBorrowers));
+router.get('/borrowers/:id', wrap(borrowerController.getBorrowerById));
+router.post('/borrowers', wrap(borrowerController.createBorrower));
+router.put('/borrowers/:id', wrap(borrowerController.updateBorrower));
+router.delete('/borrowers/:id', wrap(borrowerController.deleteBorrower));
 
 // Loans
-router.post('/loans', loanController.createLoan);
-router.put('/loans/:id', loanController.updateLoan);
-router.put('/loans/:id/status', loanController.updateLoanStatus);
-router.delete('/loans/:id', loanController.deleteLoan);
+router.post('/loans', wrap(loanController.createLoan));
+router.put('/loans/:id', wrap(loanController.updateLoan));
+router.put('/loans/:id/status', wrap(loanController.updateLoanStatus));
+router.delete('/loans/:id', wrap(loanController.deleteLoan));
 
 // Interest Records (Quick Clear Due)
-router.put('/interest-records/:id/clear', loanController.clearInterestRecord);
+router.put('/interest-records/:id/clear', wrap(loanController.clearInterestRecord));
 
 // Payments (FIFO)
-router.post('/payments', paymentController.recordPayment);
-router.get('/payments', paymentController.getPaymentHistory);
-router.put('/payments/:id', paymentController.updatePayment);
-router.delete('/payments/:id', paymentController.deletePayment);
+router.post('/payments', wrap(paymentController.recordPayment));
+router.get('/payments', wrap(paymentController.getPaymentHistory));
+router.put('/payments/:id', wrap(paymentController.updatePayment));
+router.delete('/payments/:id', wrap(paymentController.deletePayment));
 
 // Reports
-router.get('/reports/excel', reportController.exportExcelReport);
+router.get('/reports/excel', wrap(reportController.exportExcelReport));
 
 module.exports = router;

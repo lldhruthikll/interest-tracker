@@ -1,70 +1,54 @@
-const prisma = require('../config/db');
 const { syncLoanInterestRecords, getDueDatesForLoan } = require('../services/interestService');
 const { toPaise, fromPaise, parseAmountPaise } = require('../lib/money');
 const { todayIST, toDateOnly, toDbDate, isValidDateStr } = require('../lib/dates');
-const { HttpError } = require('../lib/errors');
-
-const httpError = (res, error) => res.status(error.status).json({ error: error.message });
+const { ValidationError, NotFound, parseId } = require('../lib/errors');
+const { requireOwned } = require('../lib/ownerDb');
 
 async function createLoan(req, res) {
-  try {
-    const { borrowerId, principal, monthlyInterest, startDate, notes } = req.body;
+  const { borrowerId, principal, monthlyInterest, startDate, notes } = req.body;
 
-    if (!borrowerId || !principal || !monthlyInterest || !startDate) {
-      return res.status(400).json({
-        error: 'Borrower ID, Principal, Monthly Interest, and Start Date are required',
-      });
-    }
-
-    if (!isValidDateStr(startDate)) {
-      return res.status(400).json({ error: 'Invalid start date format' });
-    }
-
-    const newLoan = await prisma.loan.create({
-      data: {
-        ownerId: req.user.id,
-        borrowerId: Number(borrowerId),
-        principal: fromPaise(parseAmountPaise(principal)),
-        monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)),
-        startDate: toDbDate(startDate),
-        dueDay: Number(startDate.slice(8, 10)),
-        status: 'ACTIVE',
-        notes: notes || null,
-      },
-    });
-
-    // Synchronise interest records immediately for this new loan
-    await syncLoanInterestRecords(newLoan.id);
-
-    const loanWithRecords = await prisma.loan.findUnique({
-      where: { id: newLoan.id },
-      include: { interestRecords: true },
-    });
-
-    return res.status(201).json(loanWithRecords);
-  } catch (error) {
-    if (error instanceof HttpError) return httpError(res, error);
-    console.error('Error creating loan:', error);
-    return res.status(500).json({ error: 'Failed to create loan' });
+  if (!borrowerId || !principal || !monthlyInterest || !startDate) {
+    throw new ValidationError('Borrower ID, Principal, Monthly Interest, and Start Date are required');
   }
+  if (!isValidDateStr(startDate)) throw new ValidationError('Invalid start date format');
+
+  const borrower = await requireOwned(req.db, 'borrower', parseId(borrowerId));
+
+  const newLoan = await req.db.loan.create({
+    data: {
+      borrowerId: borrower.id,
+      principal: fromPaise(parseAmountPaise(principal)),
+      monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)),
+      startDate: toDbDate(startDate),
+      dueDay: Number(startDate.slice(8, 10)),
+      status: 'ACTIVE',
+      notes: notes || null,
+    },
+  });
+
+  // Synchronise interest records immediately for this new loan
+  await syncLoanInterestRecords(req.db, newLoan.id);
+
+  const loanWithRecords = await req.db.loan.findUnique({
+    where: { id: newLoan.id },
+    include: { interestRecords: true },
+  });
+
+  return res.status(201).json(loanWithRecords);
 }
 
 async function updateLoan(req, res) {
-  try {
-    const { id } = req.params;
-    const { principal, monthlyInterest, startDate, notes } = req.body;
+  const id = parseId(req.params.id);
+  const { principal, monthlyInterest, startDate, notes } = req.body;
 
-    if (startDate && !isValidDateStr(startDate)) {
-      return res.status(400).json({ error: 'Invalid start date format' });
-    }
+  if (startDate && !isValidDateStr(startDate)) throw new ValidationError('Invalid start date format');
 
-    const existing = await prisma.loan.findUnique({ where: { id: Number(id) } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Loan not found' });
-    }
+  // One transaction: a failure can't leave the old and new schedules' dues side by side.
+  const updatedLoan = await req.db.$transaction(async (tx) => {
+    const existing = await requireOwned(tx, 'loan', id);
 
-    const updatedLoan = await prisma.loan.update({
-      where: { id: Number(id) },
+    const updated = await tx.loan.update({
+      where: { id },
       data: {
         ...(principal !== undefined && { principal: fromPaise(parseAmountPaise(principal)) }),
         ...(monthlyInterest !== undefined && { monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)) }),
@@ -75,121 +59,80 @@ async function updateLoan(req, res) {
 
     // Start date moved: drop unpaid dues that are no longer on the schedule. Dues with any payment are kept.
     if (startDate && startDate !== toDateOnly(existing.startDate)) {
-      await prisma.interestRecord.deleteMany({
+      await tx.interestRecord.deleteMany({
         where: {
-          loanId: updatedLoan.id,
+          loanId: id,
           paidAmount: 0,
           dueDate: { notIn: getDueDatesForLoan(startDate, todayIST()).map(toDbDate) },
         },
       });
     }
 
-    if (updatedLoan.status === 'ACTIVE') {
-      await syncLoanInterestRecords(updatedLoan.id);
-    }
+    if (updated.status === 'ACTIVE') await syncLoanInterestRecords(tx, id);
+    return updated;
+  });
 
-    return res.json(updatedLoan);
-  } catch (error) {
-    if (error instanceof HttpError) return httpError(res, error);
-    console.error('Error updating loan:', error);
-    return res.status(500).json({ error: 'Failed to update loan details' });
-  }
+  return res.json(updatedLoan);
 }
 
 async function updateLoanStatus(req, res) {
-  try {
-    const { id } = req.params;
-    const { status } = req.body; // 'ACTIVE' or 'CLOSED'
+  const id = parseId(req.params.id);
+  const { status } = req.body; // 'ACTIVE' or 'CLOSED'
 
-    if (!['ACTIVE', 'CLOSED'].includes(status)) {
-      return res.status(400).json({ error: 'Status must be ACTIVE or CLOSED' });
-    }
+  if (!['ACTIVE', 'CLOSED'].includes(status)) throw new ValidationError('Status must be ACTIVE or CLOSED');
 
-    const updatedLoan = await prisma.loan.update({
-      where: { id: Number(id) },
-      data: { status },
-    });
+  const updatedLoan = await req.db.loan.update({ where: { id }, data: { status } }); // not owned -> P2025 -> 404
 
-    if (status === 'ACTIVE') {
-      await syncLoanInterestRecords(updatedLoan.id);
-    }
+  if (status === 'ACTIVE') await syncLoanInterestRecords(req.db, id);
 
-    return res.json(updatedLoan);
-  } catch (error) {
-    console.error('Error updating loan status:', error);
-    return res.status(500).json({ error: 'Failed to update loan status' });
-  }
+  return res.json(updatedLoan);
 }
 
 async function deleteLoan(req, res) {
-  try {
-    const { id } = req.params;
-
-    await prisma.loan.delete({
-      where: { id: Number(id) },
-    });
-
-    return res.json({ message: 'Loan deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting loan:', error);
-    return res.status(500).json({ error: 'Failed to delete loan' });
-  }
+  await req.db.loan.delete({ where: { id: parseId(req.params.id) } }); // not owned -> P2025 -> 404
+  return res.json({ message: 'Loan deleted successfully' });
 }
 
 async function clearInterestRecord(req, res) {
-  try {
-    const { id } = req.params; // interestRecord id
+  const record = await req.db.interestRecord.findUnique({
+    where: { id: parseId(req.params.id) },
+    include: { loan: true },
+  });
+  if (!record) throw new NotFound('Interest record not found');
 
-    const record = await prisma.interestRecord.findUnique({
-      where: { id: Number(id) },
-      include: { loan: true },
+  const pendingPaise = toPaise(record.amount) - toPaise(record.paidAmount);
+  if (pendingPaise <= 0) throw new ValidationError('This record is already fully paid');
+
+  // Allocate payment to clear this specific record
+  await req.db.$transaction(async (tx) => {
+    const payment = await tx.payment.create({
+      data: {
+        borrowerId: record.loan.borrowerId,
+        loanId: record.loanId,
+        amount: fromPaise(pendingPaise),
+        paymentDate: new Date(),
+        notes: `Cleared due for ${record.periodName}`,
+      },
     });
 
-    if (!record) {
-      return res.status(404).json({ error: 'Interest record not found' });
-    }
-
-    const pendingPaise = toPaise(record.amount) - toPaise(record.paidAmount);
-    if (pendingPaise <= 0) {
-      return res.status(400).json({ error: 'This record is already fully paid' });
-    }
-
-    // Allocate payment to clear this specific record
-    await prisma.$transaction(async (tx) => {
-      const payment = await tx.payment.create({
-        data: {
-          ownerId: record.ownerId,
-          borrowerId: record.loan.borrowerId,
-          loanId: record.loanId,
-          amount: fromPaise(pendingPaise),
-          paymentDate: new Date(),
-          notes: `Cleared due for ${record.periodName}`,
-        },
-      });
-
-      await tx.interestRecord.update({
-        where: { id: record.id },
-        data: {
-          paidAmount: record.amount,
-          status: 'PAID',
-        },
-      });
-
-      await tx.paymentAllocation.create({
-        data: {
-          ownerId: record.ownerId,
-          paymentId: payment.id,
-          interestRecordId: record.id,
-          amount: fromPaise(pendingPaise),
-        },
-      });
+    await tx.interestRecord.update({
+      where: { id: record.id },
+      data: {
+        paidAmount: record.amount,
+        status: 'PAID',
+      },
     });
 
-    return res.json({ message: 'Due cleared successfully' });
-  } catch (error) {
-    console.error('Error clearing interest record:', error);
-    return res.status(500).json({ error: 'Failed to clear due record' });
-  }
+    await tx.paymentAllocation.create({
+      data: {
+        paymentId: payment.id,
+        interestRecordId: record.id,
+        amount: fromPaise(pendingPaise),
+      },
+    });
+  });
+
+  return res.json({ message: 'Due cleared successfully' });
 }
 
 module.exports = {
