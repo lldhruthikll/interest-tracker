@@ -4,12 +4,17 @@
   "description": "Backend API for Interest Collection Manager",
   "main": "src/index.js",
   "scripts": {
-    "start": "npx prisma db push && node src/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "dev": "node scripts/local.js node --watch src/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:db:push": "prisma db push",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "test": "node scripts/local.js --test node --test --test-concurrency=1 test/",
+    "db:migrate": "node scripts/local.js npx prisma migrate dev",
+    "db:test:reset": "node scripts/local.js --test npx prisma migrate reset --force --skip-seed",
+    "db:status": "node scripts/local.js npx prisma migrate status",
+    "db:studio": "node scripts/local.js npx prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^5.19.0",

@@ -34,3 +34,8 @@ Thumbs.db
 
 # Brainstorm mockups
 .superpowers/
+
+# Local env (v2)
+.env.local
+.env.test
+*.local
