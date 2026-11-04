@@ -31,7 +31,7 @@ function AgreementCard({ a, today }) {
         <h3 className="mb-2 font-black">Month by month</h3>
         <ul className="space-y-2">
           {[...a.dues].reverse().map((d) => (
-            <li key={d.period} className="neu-in flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
+            <li key={d.period} className="glass-in flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
               <div>
                 <p className="font-extrabold">{periodLabel(d.period)}</p>
                 <p className="text-sm font-semibold text-muted">Due {formatDate(String(d.dueDate).slice(0, 10))}</p>

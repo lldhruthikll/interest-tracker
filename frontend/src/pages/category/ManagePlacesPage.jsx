@@ -73,7 +73,7 @@ export default function ManagePlacesPage() {
           {p.units.length === 0 ? <p className="font-semibold text-muted">No {cat.unitLabel.toLowerCase()} yet.</p> : (
             <ul className="space-y-2">
               {p.units.map((u) => (
-                <li key={u.id} className="neu-in flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3.5">
+                <li key={u.id} className="glass-in flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3.5">
                   <div>
                     <span className="font-extrabold">{u.name}</span>{' '}
                     {u.archived ? <StatusPill status="Archived" /> : u.agreement && <span className="text-sm font-semibold text-muted">· {u.agreement.payer?.name}</span>}

@@ -14,7 +14,7 @@ export default function CategorySettingsPage() {
   const [ok, setOk] = useState('');
 
   useEffect(() => {
-    if (cat) setF({ name: cat.name, placeLabel: cat.placeLabel, unitLabel: cat.unitLabel, payerLabel: cat.payerLabel, color: cat.color || '#8db9f0' });
+    if (cat) setF({ name: cat.name, placeLabel: cat.placeLabel, unitLabel: cat.unitLabel, payerLabel: cat.payerLabel, color: cat.color || '#737373' });
   }, [cat]);
 
   if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
@@ -43,7 +43,7 @@ export default function CategorySettingsPage() {
         <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {cat.placeLabel}</Link>
       </PageHeader>
       <ErrorNote>{error}</ErrorNote>
-      {ok && <p role="status" className="clay-paid rounded-2xl px-4 py-3 text-sm font-bold">{ok}</p>}
+      {ok && <p role="status" className="glass rounded-2xl px-4 py-3 text-sm font-bold">{ok}</p>}
       <Card>
         <form onSubmit={save} className="space-y-4">
           <Field label="Category name" required value={f.name} onChange={set('name')} />

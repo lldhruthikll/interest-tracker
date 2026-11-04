@@ -26,7 +26,7 @@ export default function DueCalendar({ events = [], month, onMonthChange, subtitl
   const days = [...Array(firstDayOfWeek).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
-    <div className="neu rounded-xl3 p-4 sm:p-6">
+    <div className="glass rounded-xl3 p-4 sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black">{MONTHS[month0]} {year}</h2>
@@ -50,9 +50,9 @@ export default function DueCalendar({ events = [], month, onMonthChange, subtitl
               const isToday = dateStr === todayStr;
               const list = byDate.get(dateStr) || [];
               return (
-                <div key={dateStr} className={`flex h-28 flex-col gap-1 overflow-hidden rounded-2xl p-2 ${isToday ? 'neu ring-2 ring-accent-ink' : 'neu-in'}`}>
+                <div key={dateStr} className={`flex h-28 flex-col gap-1 overflow-hidden rounded-2xl p-2 ${isToday ? 'glass ring-2 ring-ink' : 'glass-in'}`}>
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-black ${isToday ? 'text-accent-ink' : 'text-ink'}`}>{n}{isToday && ' · Today'}</span>
+                    <span className={`text-xs font-black ${isToday ? 'text-ink' : 'text-ink'}`}>{n}{isToday && ' · Today'}</span>
                     {list.length > 0 && <span className="text-[10px] font-extrabold text-muted">{list.length} due</span>}
                   </div>
                   <div className="space-y-1 overflow-y-auto">
@@ -60,7 +60,7 @@ export default function DueCalendar({ events = [], month, onMonthChange, subtitl
                       const [tone, word] = eventState(e, todayStr);
                       const left = Math.max(e.amount - e.paid, 0);
                       return (
-                        <Link key={i} to={e.link} className={`clay-${tone} block truncate rounded-lg px-1.5 py-1 text-[11px] font-bold`}
+                        <Link key={i} to={e.link} className={`tone-${tone} block truncate rounded-lg px-1.5 py-1 text-[11px] font-bold`}
                           title={`${e.ledgerName}: ${e.title} - ${word} - ${formatINR(left || e.amount)}`}>
                           <div className="truncate">{e.title}</div>
                           <div className="tabnum text-[10px]">{formatINR(left || e.amount)} · {word}</div>

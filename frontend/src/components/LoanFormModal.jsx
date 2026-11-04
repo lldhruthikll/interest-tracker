@@ -86,7 +86,7 @@ export default function LoanFormModal({ isOpen, onClose, onSuccess, borrowerId, 
               const on = interestRate === r.toString();
               return (
                 <button key={r} type="button" aria-pressed={on} onClick={() => handleRateChange(r.toString())}
-                  className={`rounded-full px-3 py-1 text-sm font-bold ${on ? 'neu-in text-accent-ink' : 'neu text-muted'}`}>
+                  className={`chip !px-3 !py-1 text-sm ${on ? 'chip-on' : ''}`}>
                   {r}%
                 </button>
               );

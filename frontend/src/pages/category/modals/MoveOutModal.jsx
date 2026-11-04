@@ -58,7 +58,7 @@ export default function MoveOutModal({ open, agreement, onClose, onDone }) {
         {!pv && !error && <p className="font-bold text-muted">Calculating…</p>}
         {pv && (
           <>
-            <dl className="neu-in space-y-1 rounded-2xl p-4 text-sm font-bold tabnum">
+            <dl className="glass-in space-y-1 rounded-2xl p-4 text-sm font-bold tabnum">
               <div className="flex justify-between"><dt>Unpaid dues</dt><dd>{formatINR(pv.unpaidPaise / 100)}</dd></div>
               <div className="flex justify-between"><dt>Advance held</dt><dd>{formatINR(pv.advanceHeldPaise / 100)}</dd></div>
               <div className="flex justify-between"><dt>Credit (paid ahead)</dt><dd>{formatINR(pv.creditPaise / 100)}</dd></div>
@@ -79,7 +79,7 @@ export default function MoveOutModal({ open, agreement, onClose, onDone }) {
                 </div>
               </>
             )}
-            <div className="clay clay-advance space-y-1 rounded-2xl p-4 text-sm font-bold tabnum">
+            <div className="glass-in space-y-1 rounded-2xl p-4 text-sm font-bold tabnum">
               {applied > 0 && <div className="flex justify-between"><span>Advance applied to dues</span><span>{formatINR(applied / 100)}</span></div>}
               {unpaidAfter > 0 && <div className="flex justify-between"><span>Still unpaid after move-out</span><span>{formatINR(unpaidAfter / 100)}</span></div>}
               {retP > 0 && <div className="flex justify-between"><span>Retained</span><span>{formatINR(retP / 100)}</span></div>}

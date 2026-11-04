@@ -69,7 +69,7 @@ export default function LendingDashboardPage() {
   };
 
   const dueRow = (item, sub, action, label) => (
-    <li key={item.recordId} className="neu-in flex items-center justify-between gap-3 rounded-2xl p-3.5">
+    <li key={item.recordId} className="glass-in flex items-center justify-between gap-3 rounded-2xl p-3.5">
       <div className="min-w-0">
         <Link to={`/lending/borrowers/${item.borrowerId}`} className="block truncate font-extrabold hover:underline">{item.borrowerName}</Link>
         <p className="text-sm font-semibold text-muted">{sub}</p>
@@ -135,7 +135,7 @@ export default function LendingDashboardPage() {
         {fUpcoming.length === 0 ? <p className="py-6 text-center font-bold text-muted">No payments due in the next 7 days.</p> : (
           <ul className="grid grid-cols-1 gap-3 p-1 sm:grid-cols-2 lg:grid-cols-3">
             {fUpcoming.map((i) => (
-              <li key={i.recordId} className="neu-in flex items-center justify-between gap-3 rounded-2xl p-3.5">
+              <li key={i.recordId} className="glass-in flex items-center justify-between gap-3 rounded-2xl p-3.5">
                 <div className="min-w-0">
                   <Link to={`/lending/borrowers/${i.borrowerId}`} className="block truncate font-extrabold hover:underline">{i.borrowerName}</Link>
                   <p className="text-sm font-semibold text-muted">Due: {formatDate(i.dueDate)}</p>
@@ -163,8 +163,8 @@ export default function LendingDashboardPage() {
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const COLLECTED = '#8db9f0'; // accent
-const PENDING = '#f5b69e'; // peach
+const COLLECTED = 'rgb(var(--c1))'; // solid ink
+const PENDING = 'rgb(var(--c3))'; // light grey, outlined
 
 function AnalyticsSection({ analyticsData, analyticsLoading, analyticsYear, analyticsMonth, onYearChange, onMonthChange }) {
   const currentYear = new Date().getFullYear();
@@ -213,11 +213,11 @@ function AnalyticsSection({ analyticsData, analyticsLoading, analyticsYear, anal
           {monthlyTrend.length > 0 && (
             <div>
               <h3 className="mb-3 text-sm font-extrabold text-muted">12-month trend</h3>
-              <div className="neu-in w-full overflow-x-auto rounded-3xl p-3">
+              <div className="glass-in w-full overflow-x-auto rounded-3xl p-3">
                 <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} className="w-full min-w-[400px]" style={{ height: 180 }} role="img"
                   aria-label="Twelve-month bar chart of interest collected and pending">
                   {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-                    <line key={f} x1={0} y1={chartH - f * chartH} x2={chartW} y2={chartH - f * chartH} stroke="#d4d3ea" strokeWidth={1} />
+                    <line key={f} x1={0} y1={chartH - f * chartH} x2={chartW} y2={chartH - f * chartH} style={{ stroke: 'var(--c-grid)' }} strokeWidth={1} />
                   ))}
                   {monthlyTrend.map((m, i) => {
                     const x = barGap + i * (barW + barGap);
@@ -227,18 +227,18 @@ function AnalyticsSection({ analyticsData, analyticsLoading, analyticsYear, anal
                     return (
                       <g key={i}>
                         <title>{`${m.label}: collected ${formatINR(m.totalCollected)} of ${formatINR(m.totalExpected)}`}</title>
-                        {/* full bar = expected; peach part visible above collected = pending */}
-                        <rect x={x} y={chartH - expectedH} width={barW} height={expectedH} rx={3} fill={PENDING} stroke={sel ? '#1e3a66' : 'none'} strokeWidth={2} />
-                        <rect x={x} y={chartH - collectedH} width={barW} height={collectedH} rx={3} fill={COLLECTED} />
-                        <text x={x + barW / 2} y={chartH + 16} textAnchor="middle" fontSize={10} fill={sel ? '#1e3a66' : '#55607a'} fontWeight={sel ? 800 : 600}>{m.label}</text>
+                        {/* full bar = expected; grey part visible above collected = pending */}
+                        <rect x={x} y={chartH - expectedH} width={barW} height={expectedH} rx={3} style={{ fill: PENDING, stroke: sel ? 'rgb(var(--ink))' : 'rgb(var(--muted))' }} strokeWidth={sel ? 2 : 1} />
+                        <rect x={x} y={chartH - collectedH} width={barW} height={collectedH} rx={3} style={{ fill: COLLECTED }} />
+                        <text x={x + barW / 2} y={chartH + 16} textAnchor="middle" fontSize={10} fontWeight={sel ? 800 : 600} style={{ fill: sel ? 'rgb(var(--ink))' : 'rgb(var(--muted))' }}>{m.label}</text>
                       </g>
                     );
                   })}
                 </svg>
               </div>
               <div className="mt-2 flex items-center gap-5 text-sm font-bold text-muted">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: COLLECTED }} /> Collected</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: PENDING }} /> Pending</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border border-ink/40" style={{ background: COLLECTED }} /> Collected</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border border-muted" style={{ background: PENDING }} /> Pending</span>
               </div>
             </div>
           )}

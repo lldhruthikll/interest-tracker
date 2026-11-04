@@ -61,12 +61,12 @@ export default function BorrowersPage() {
                     <p className="text-sm font-semibold text-muted">{b.phone}</p>
                     {b.address && <p className="truncate text-sm font-semibold text-muted">{b.address}</p>}
                   </div>
-                  <span className={`pill shrink-0 ${b.activeLoansCount > 0 ? 'clay-paid' : 'neu-in text-muted'}`}>{b.activeLoansCount} active loan(s)</span>
+                  <span className={`pill shrink-0 ${b.activeLoansCount > 0 ? 'tone-paid' : 'tone-neutral'}`}>{b.activeLoansCount} active loan(s)</span>
                 </div>
-                <div className="neu-in mt-4 grid grid-cols-2 gap-3 rounded-2xl p-3.5 text-sm">
+                <div className="glass-in mt-4 grid grid-cols-2 gap-3 rounded-2xl p-3.5 text-sm">
                   <Stat label="Total principal">{formatINR(b.totalPrincipal)}</Stat>
                   <Stat label="Monthly interest">{formatINR(b.totalMonthlyInterest)}</Stat>
-                  <Stat label="Pending amount"><span className={b.totalPendingInterest > 0 ? 'text-clay-overdue-ink' : 'text-muted'}>{formatINR(b.totalPendingInterest)}</span></Stat>
+                  <Stat label="Pending amount"><span className={b.totalPendingInterest > 0 ? 'text-ink' : 'text-muted'}>{formatINR(b.totalPendingInterest)}</span></Stat>
                   <Stat label="Next due date">{b.nextDueDate ? formatDate(b.nextDueDate) : 'N/A'}</Stat>
                 </div>
               </div>
@@ -74,7 +74,7 @@ export default function BorrowersPage() {
                 <Button onClick={() => { setSelectedBorrowerId(b.id); setIsPaymentModalOpen(true); }} aria-label={`Record payment for ${b.name}`}>
                   <IndianRupee size={16} /> Pay
                 </Button>
-                <Link to={`/lending/borrowers/${b.id}`} className="font-extrabold text-accent-ink hover:underline">View profile</Link>
+                <Link to={`/lending/borrowers/${b.id}`} className="font-extrabold text-ink hover:underline">View profile</Link>
               </div>
             </Card>
           ))}

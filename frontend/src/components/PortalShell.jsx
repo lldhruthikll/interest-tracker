@@ -2,14 +2,17 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Backdrop, Logo } from './ui';
+import { ThemeSwitch } from '../lib/theme';
 
 export default function PortalShell() {
   const { user, logout } = useAuth();
   return (
     <div className="mx-auto min-h-screen max-w-4xl p-3 md:p-6">
-      <header className="neu mb-5 flex items-center justify-between rounded-xl3 px-5 py-3">
+      <Backdrop />
+      <header className="glass mb-5 flex items-center justify-between rounded-xl3 px-5 py-3">
         <div className="flex items-center gap-2 text-[17px] font-black">
-          <span className="h-[26px] w-[26px] rounded-[9px]" style={{ background: 'linear-gradient(135deg,#8db9f0,#f5b69e)' }} />
+          <Logo />
           FinLedger
         </div>
         <div className="flex items-center gap-3">
@@ -18,6 +21,7 @@ export default function PortalShell() {
         </div>
       </header>
       <Outlet />
+      <footer className="mt-5 flex justify-end"><ThemeSwitch /></footer>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export default function NotificationBanner({ todaysDue = [], onOpenPaymentModal 
   const total = todaysDue.reduce((sum, item) => sum + item.pendingAmount, 0);
 
   return (
-    <div role="status" className="clay clay-partial flex flex-col items-start justify-between gap-4 rounded-3xl p-4 sm:flex-row sm:items-center">
+    <div role="status" className="glass flex flex-col items-start justify-between gap-4 rounded-3xl p-4 sm:flex-row sm:items-center">
       <div className="flex items-center gap-3">
         <Bell size={22} className="shrink-0" aria-hidden="true" />
         <div>

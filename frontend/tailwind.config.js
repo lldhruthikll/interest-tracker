@@ -1,30 +1,22 @@
 /** @type {import('tailwindcss').Config} */
+// Colors map to CSS variables defined in src/index.css (:root = light, [data-theme="dark"] = dark).
+const ch = (v) => `rgb(var(--${v}) / <alpha-value>)`;
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  safelist: [{ pattern: /^tone-/ }], // built dynamically as tone-${name}
   theme: {
     extend: {
       colors: {
-        base: '#e9e8f8',
-        ink: '#1e2a44',
-        muted: '#55607a',
-        accent: '#8db9f0',
-        'accent-ink': '#1e3a66',
-        peach: '#f5b69e',
-        line: '#d4d3ea',
-        clay: {
-          paid: '#c9f2dc', 'paid-ink': '#14532d',
-          partial: '#ffeab5', 'partial-ink': '#7a4a04',
-          overdue: '#ffd9d6', 'overdue-ink': '#8f1d1d',
-          advance: '#f5b69e', 'advance-ink': '#5c2410',
-          neutral: '#cfe2fb', 'neutral-ink': '#1e3a66',
-        },
+        base: ch('base'),
+        ink: ch('ink'),
+        muted: ch('muted'),
+        accent: ch('accent'), // primary action / active item (black in light, white in dark)
+        'accent-ink': ch('accent-ink'), // text on accent
+        line: 'var(--line)',
+        scrim: 'var(--scrim)',
       },
-      boxShadow: {
-        neu: '8px 8px 16px #c7c6de, -8px -8px 16px #ffffff',
-        'neu-in': 'inset 5px 5px 10px #c7c6de, inset -5px -5px 10px #ffffff',
-      },
-      fontFamily: { sans: ['Nunito', 'system-ui', 'sans-serif'] },
-      borderRadius: { xl2: '20px', xl3: '28px' },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+      borderRadius: { xl2: '16px', xl3: '26px' },
     },
   },
   plugins: [],

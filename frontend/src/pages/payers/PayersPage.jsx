@@ -29,7 +29,7 @@ export default function PayersPage() {
   };
 
   const cols = [
-    { key: 'name', header: 'Name', render: (p) => <Link className="font-extrabold text-accent-ink underline" to={`/payers/${p.id}`}>{p.name}</Link> },
+    { key: 'name', header: 'Name', render: (p) => <Link className="font-extrabold text-ink underline" to={`/payers/${p.id}`}>{p.name}</Link> },
     { key: 'phone', header: 'Phone' },
     { key: 'units', header: 'Active units', render: (p) => p.agreements.map((a) => a.unit.name).join(', ') || 'None' },
     { key: 'login', header: 'Login', render: (p) => (p.login ? (p.login.active ? 'Enabled' : 'Disabled') : 'None') },

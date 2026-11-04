@@ -54,7 +54,7 @@ export default function PayerDetailPage() {
   if (!p) return <Loading />;
 
   const cols = [
-    { key: 'unit', header: 'Unit', render: (a) => <Link className="font-extrabold text-accent-ink underline" to={`/agreements/${a.id}`}>{a.unit.name}</Link> },
+    { key: 'unit', header: 'Unit', render: (a) => <Link className="font-extrabold text-ink underline" to={`/agreements/${a.id}`}>{a.unit.name}</Link> },
     { key: 'place', header: 'Place', render: (a) => `${a.unit.place.category.name} · ${a.unit.place.name}` },
     { key: 'status', header: 'Status', render: (a) => <StatusPill status={a.status} /> },
     { key: 'since', header: 'Since', render: (a) => formatDate(String(a.startDate).slice(0, 10)) },

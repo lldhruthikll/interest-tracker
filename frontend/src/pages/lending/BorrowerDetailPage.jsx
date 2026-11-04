@@ -66,7 +66,7 @@ export default function BorrowerDetailPage() {
   if (error || !borrower) {
     return (
       <div className="space-y-4">
-        <Link to="/lending/borrowers" className="font-extrabold text-accent-ink hover:underline">Back to borrowers</Link>
+        <Link to="/lending/borrowers" className="font-extrabold text-ink hover:underline">Back to borrowers</Link>
         <ErrorNote>{error || 'Borrower not found'}</ErrorNote>
       </div>
     );
@@ -86,7 +86,7 @@ export default function BorrowerDetailPage() {
     { key: 'status', header: 'Status', render: (rec) => (
       <span className="flex items-center gap-2">
         <StatusPill status={rec.status} />
-        {rec.status !== 'PAID' && <button type="button" onClick={() => handleClearInterestRecord(rec)} className="text-sm font-extrabold text-accent-ink underline">Mark paid</button>}
+        {rec.status !== 'PAID' && <button type="button" onClick={() => handleClearInterestRecord(rec)} className="text-sm font-extrabold text-ink underline">Mark paid</button>}
       </span>
     ) },
   ];
@@ -107,7 +107,7 @@ export default function BorrowerDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/lending/borrowers" className="inline-block font-extrabold text-accent-ink hover:underline">Back to borrowers list</Link>
+      <Link to="/lending/borrowers" className="inline-block font-extrabold text-ink hover:underline">Back to borrowers list</Link>
 
       <Card>
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -118,7 +118,7 @@ export default function BorrowerDetailPage() {
               <button type="button" className="btn !p-2" aria-label="Delete borrower" title="Delete borrower" onClick={handleDeleteBorrower}><Trash2 size={16} /></button>
             </h1>
             <p className="mt-1 font-semibold text-muted">{borrower.phone}{borrower.address ? ` • ${borrower.address}` : ''}</p>
-            {borrower.notes && <p className="neu-in mt-2 inline-block rounded-xl px-3 py-1.5 text-sm font-semibold text-muted">Notes: {borrower.notes}</p>}
+            {borrower.notes && <p className="glass-in mt-2 inline-block rounded-xl px-3 py-1.5 text-sm font-semibold text-muted">Notes: {borrower.notes}</p>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
             <Button variant="secondary" onClick={() => { setLoanToEdit(null); setIsLoanModalOpen(true); }}><Plus size={16} /> Add New Loan</Button>
@@ -146,7 +146,7 @@ export default function BorrowerDetailPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-lg font-black tabnum">Principal: {formatINR(loan.principal)}</span>
-                  <span className={`pill ${loan.status === 'ACTIVE' ? 'clay-paid' : 'neu-in text-muted'}`}>{loan.status === 'ACTIVE' ? 'Active' : 'Closed'}</span>
+                  <span className={`pill ${loan.status === 'ACTIVE' ? 'tone-paid' : 'tone-neutral'}`}>{loan.status === 'ACTIVE' ? 'Active' : 'Closed'}</span>
                 </div>
                 <p className="mt-1 flex flex-wrap gap-x-3 text-sm font-semibold text-muted">
                   <span>Monthly interest: <strong className="text-ink">{formatINR(loan.monthlyInterest)}</strong></span>

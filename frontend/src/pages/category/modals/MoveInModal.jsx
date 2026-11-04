@@ -75,7 +75,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
             {units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.placeName}</option>)}
           </Select>
         )}
-        <div className="neu-in space-y-3 rounded-2xl p-4">
+        <div className="glass-in space-y-3 rounded-2xl p-4">
           <div className="flex gap-2">
             <Button variant={payerMode === 'existing' ? 'primary' : 'secondary'} className="!px-3 !py-1.5 text-sm" onClick={() => setPayerMode('existing')}>Existing {cat.payerLabel.toLowerCase()}</Button>
             <Button variant={payerMode === 'new' ? 'primary' : 'secondary'} className="!px-3 !py-1.5 text-sm" onClick={() => setPayerMode('new')}>+ New</Button>
@@ -106,7 +106,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
           {f.advanceAmount !== '' && <Field label="Advance date" type="date" value={f.advanceDate} onChange={set('advanceDate')} />}
         </div>
         <Field label="Notes (optional)" value={f.notes} onChange={set('notes')} />
-        <p aria-live="polite" className="neu-in rounded-2xl px-4 py-3 text-sm font-bold tabnum">
+        <p aria-live="polite" className="glass-in rounded-2xl px-4 py-3 text-sm font-bold tabnum">
           {pv ? `First due: ${formatINR(pv[0].amount)} on ${formatDate(pv[0].dueDate)}${pv[1] ? ` · Next: ${formatINR(pv[1].amount)} on ${formatDate(pv[1].dueDate)}` : ''}`
             : preview?.error || 'Enter the date, due day and amount to preview the first dues.'}
         </p>

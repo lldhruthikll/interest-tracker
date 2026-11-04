@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { ThemeSwitch } from '../../lib/theme';
 import { Button, Card, Table, Field, Loading, ErrorNote, PageHeader } from '../../components/ui';
 
 function PasswordCard() {
@@ -82,6 +83,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" sub={user?.name} />
+      <Card><ThemeSwitch /></Card>
       <PasswordCard />
       {user?.role === 'ADMIN' && <FamilyCard />}
     </div>

@@ -50,7 +50,7 @@ export default function RecurringPaymentModal({ open, agreements = [], agreement
             </Select>
           </>
         )}
-        {unpaidNow != null && <p className="neu-in rounded-2xl px-4 py-3 text-sm font-bold tabnum">Unpaid before this payment: {formatINR(unpaidNow)}</p>}
+        {unpaidNow != null && <p className="glass-in rounded-2xl px-4 py-3 text-sm font-bold tabnum">Unpaid before this payment: {formatINR(unpaidNow)}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Amount (₹)" type="number" min="0" step="0.01" required value={f.amount} onChange={set('amount')} />
           <Field label="Payment date" type="date" required max={todayIST()} value={f.paymentDate} onChange={set('paymentDate')} />

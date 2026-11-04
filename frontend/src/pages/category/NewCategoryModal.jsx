@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { Button, Modal, Field, ErrorNote } from '../../components/ui';
 
 export default function NewCategoryModal({ open, onClose, onCreated }) {
-  const [f, setF] = useState({ name: '', placeLabel: '', unitLabel: '', payerLabel: '', color: '#8db9f0' });
+  const [f, setF] = useState({ name: '', placeLabel: '', unitLabel: '', payerLabel: '', color: '#737373' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -13,7 +13,7 @@ export default function NewCategoryModal({ open, onClose, onCreated }) {
     setError(''); setBusy(true);
     try {
       const c = await api.createCategory(Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()])));
-      setF({ name: '', placeLabel: '', unitLabel: '', payerLabel: '', color: '#8db9f0' });
+      setF({ name: '', placeLabel: '', unitLabel: '', payerLabel: '', color: '#737373' });
       onCreated(c);
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };

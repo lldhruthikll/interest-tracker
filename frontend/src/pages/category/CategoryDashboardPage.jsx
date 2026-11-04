@@ -34,8 +34,8 @@ export default function CategoryDashboardPage() {
 
   const columns = [
     { key: 'unitName', header: L.unit, render: (u) => (u.agreementId
-      ? <Link className="font-extrabold text-accent-ink underline" to={`/agreements/${u.agreementId}`}>{u.unitName}</Link>
-      : <button type="button" className="font-extrabold text-accent-ink underline" onClick={() => setMoveIn({ unitId: u.unitId })}>{u.unitName}</button>) },
+      ? <Link className="font-extrabold text-ink underline" to={`/agreements/${u.agreementId}`}>{u.unitName}</Link>
+      : <button type="button" className="font-extrabold text-ink underline" onClick={() => setMoveIn({ unitId: u.unitId })}>{u.unitName}</button>) },
     { key: 'placeName', header: L.place },
     { key: 'payer', header: L.payer, render: (u) => u.payer?.name || '—' },
     { key: 'amount', header: 'Amount', align: 'right', render: (u) => formatINR(u.amount) },
