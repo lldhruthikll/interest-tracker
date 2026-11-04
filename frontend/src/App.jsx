@@ -16,14 +16,10 @@ import CategorySettingsPage from './pages/category/CategorySettingsPage';
 import ManagePlacesPage from './pages/category/ManagePlacesPage';
 import CategoryDashboardPage from './pages/category/CategoryDashboardPage';
 import AgreementDetailPage from './pages/category/AgreementDetailPage';
-import { EmptyState } from './components/ui';
-
-const Placeholder = ({ title }) => (
-  <div>
-    <h1 className="mb-4 text-2xl font-black">{title}</h1>
-    <EmptyState title="Coming soon">This screen is built in a later step.</EmptyState>
-  </div>
-);
+import PayersPage from './pages/payers/PayersPage';
+import PayerDetailPage from './pages/payers/PayerDetailPage';
+import SettingsPage from './pages/settings/SettingsPage';
+import PortalPage from './pages/portal/PortalPage';
 
 const BorrowerRedirect = () => <Navigate to={`/lending/borrowers/${useParams().id}`} replace />;
 
@@ -47,7 +43,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/portal" element={<Gate portal />}>
-        <Route index element={<Placeholder title="My account" />} />
+        <Route index element={<PortalPage />} />
       </Route>
       <Route element={<Gate />}>
         <Route path="/" element={<OverviewPage />} />
@@ -65,8 +61,9 @@ export default function App() {
         <Route path="/c/:categoryId/manage" element={<ManagePlacesPage />} />
         <Route path="/c/:categoryId/settings" element={<CategorySettingsPage />} />
         <Route path="/agreements/:id" element={<AgreementDetailPage />} />
-        <Route path="/payers" element={<Placeholder title="Payers" />} />
-        <Route path="/settings" element={<Placeholder title="Settings" />} />
+        <Route path="/payers" element={<PayersPage />} />
+        <Route path="/payers/:id" element={<PayerDetailPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
