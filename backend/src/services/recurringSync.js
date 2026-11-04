@@ -25,8 +25,9 @@ async function syncAgreement(db, agreementId, { until = todayIST(), materializeA
   }
   for (const s of schedule) {
     const d = existing.get(s.period);
-    // never change money already collected: only unpaid dues follow the schedule
-    if (d && toPaise(d.paidAmount) === 0 && toPaise(d.amount) !== s.amountPaise) {
+    // unpaid dues follow the schedule; a paid due may only shrink, on move-out (excess → credit via reallocate)
+    const cur = d && toPaise(d.amount);
+    if (d && cur !== s.amountPaise && (toPaise(d.paidAmount) === 0 || (a.status === 'ENDED' && s.amountPaise < cur))) {
       await db.recurringDue.update({ where: { id: d.id }, data: { amount: fromPaise(s.amountPaise) } });
     }
   }

@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../src/config/db');
 const { forOwner } = require('../src/lib/ownerDb');
 const { toDbDate } = require('../src/lib/dates');
-const { syncAgreement } = require('../src/services/recurringSync');
+const { syncAgreement, agreementBalances } = require('../src/services/recurringSync');
 const { resetDb, startServer, api } = require('./helpers');
 
 let srv, A, B, ta, tb, db, agr;
@@ -68,6 +68,21 @@ test('sync, FIFO payments, edit/delete reversal, credit, rate change', async () 
   await db.rateChange.create({ data: { agreementId: agr.id, amount: 35000, effectiveFrom: '2026-07' } });
   await sync('2026-08-05');
   assert.deepEqual((await dues()).slice(4), [['2026-07', 31000, 5000, 'PARTIALLY_PAID'], ['2026-08', 35000, 0, 'PENDING']]);
+});
+
+test('move-out shrinks a paid final due; excess becomes credit', async () => {
+  // reuse the fixture agreement (one agreement per unit): start 2026-04-01, ₹3,000/month
+  await db.agreement.update({ where: { id: agr.id }, data: { startDate: toDbDate('2026-04-01') } });
+  await db.rateChange.updateMany({ where: { agreementId: agr.id }, data: { amount: 3000, effectiveFrom: '2026-04' } });
+  await sync('2026-06-05');
+  const p = await pay('POST', '', { agreementId: agr.id, amount: 9000, paymentDate: '2026-06-05', method: 'CASH' });
+  assert.equal(p.status, 201);
+  assert.ok((await dues()).every((d) => d[1] === 3000 && d[3] === 'PAID'));
+
+  await db.agreement.update({ where: { id: agr.id }, data: { status: 'ENDED', endDate: toDbDate('2026-06-10') } });
+  await sync('2026-06-05');
+  assert.deepEqual((await dues())[2], ['2026-06', 1000, 1000, 'PAID']);
+  assert.equal((await db.$transaction((tx) => agreementBalances(tx, agr.id))).creditPaise, 200000);
 });
 
 test('validation: amount, dates, method, ended agreement', async () => {
