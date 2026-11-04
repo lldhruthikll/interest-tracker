@@ -10,8 +10,10 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
   // vacant, non-archived units of non-archived places only
   const units = useMemo(() => cat.places.filter((p) => !p.archived)
     .flatMap((p) => p.units.filter((u) => !u.archived && !u.agreement).map((u) => ({ ...u, placeName: p.name }))), [cat]);
+  // a requested unit that is not vacant must never fall back to another unit
+  const unitMissing = unitId != null && !units.some((x) => x.id === unitId);
   const [f, setF] = useState(() => {
-    const u = units.find((x) => x.id === unitId) || units[0];
+    const u = unitMissing ? null : units.find((x) => x.id === unitId) || units[0];
     return { unitId: u?.id ?? '', startDate: todayIST(), dueDay: '1', amount: u?.defaultAmount ?? '', timing: 'IN_ADVANCE',
       firstMonthRule: 'PRORATED', lastMonthRule: 'PRORATED', advanceAmount: '', advanceDate: todayIST(), notes: '' };
   });
@@ -50,6 +52,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    if (unitMissing) return setError('The selected unit is no longer vacant.');
     if (payerMode === 'existing' && !payerId) return setError(`Choose a ${cat.payerLabel.toLowerCase()} or add a new one`);
     setBusy(true);
     try {
@@ -66,7 +69,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
   return (
     <Modal open={open} title={`Move in ${cat.payerLabel.toLowerCase()}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <ErrorNote>{error}</ErrorNote>
+        <ErrorNote>{error || (unitMissing ? 'The selected unit is not vacant, so no one can be moved in. Close this and try again.' : '')}</ErrorNote>
         {units.length === 0 ? <p className="font-bold text-muted">No vacant {cat.unitLabel.toLowerCase()} available. Add one under Manage.</p> : (
           <Select label={cat.unitLabel} value={f.unitId} onChange={pickUnit}>
             {units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.placeName}</option>)}
@@ -109,7 +112,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
         </p>
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={busy || !units.length}>{busy ? 'Saving…' : 'Move in'}</Button>
+          <Button type="submit" disabled={busy || !units.length || unitMissing}>{busy ? 'Saving…' : 'Move in'}</Button>
         </div>
       </form>
     </Modal>

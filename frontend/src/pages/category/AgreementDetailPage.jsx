@@ -43,6 +43,7 @@ export default function AgreementDetailPage() {
   const label = `${a.unit.name} · ${a.payer.name}`;
 
   const del = async (p) => {
+    if (!window.confirm('Delete this payment? This cannot be undone.')) return;
     setActionError('');
     try { await api.deleteRecurringPayment(p.id); await load(); } catch (e) { setActionError(e.message); }
   };

@@ -16,6 +16,7 @@ export default function CategoryDashboardPage() {
   const [placeId, setPlaceId] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [moveIn, setMoveIn] = useState(null); // {unitId?}
   const [paying, setPaying] = useState(false);
 
@@ -28,7 +29,7 @@ export default function CategoryDashboardPage() {
   const { stats: s, units } = data;
   const L = { place: cat.placeLabel, unit: cat.unitLabel, payer: cat.payerLabel };
   const refresh = () => { reloadCat(); return load(); };
-  const exportXlsx = async () => { try { await api.exportCategory(cat.id, cat.name.replace(/\s+/g, '_')); } catch (e) { setError(e.message); } };
+  const exportXlsx = async () => { setActionError(''); try { await api.exportCategory(cat.id, cat.name.replace(/\s+/g, '_')); } catch (e) { setActionError(e.message); } };
   const activeUnits = units.filter((u) => u.agreementId);
 
   const columns = [
@@ -49,6 +50,8 @@ export default function CategoryDashboardPage() {
         <Button onClick={exportXlsx}>Export</Button>
         <Button disabled={!activeUnits.length} onClick={() => setPaying(true)}>+ Record payment</Button>
       </PageHeader>
+
+      <ErrorNote>{actionError}</ErrorNote>
 
       {data.places.length > 0 && (
         <Chips value={placeId} onChange={setPlaceId}
