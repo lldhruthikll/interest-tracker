@@ -87,7 +87,9 @@ test('admin disables member -> existing token 401; PUT only targets MEMBER', asy
 });
 
 test('disabled PAYER token -> 401', async () => {
-  const p = await mk('tenant', 'PAYER', { payerId: 1 });
+  const owner = await mk('landlord');
+  const payer = await prisma.payer.create({ data: { ownerId: owner.id, name: 'T', phone: '1' } });
+  const p = await mk('tenant', 'PAYER', { payerId: payer.id });
   const tok = (await login('tenant')).body.token;
   assert.equal((await api(srv.url, '/api/auth/profile', { token: tok })).status, 200);
   await prisma.user.update({ where: { id: p.id }, data: { active: false } });
