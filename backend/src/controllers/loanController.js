@@ -1,5 +1,10 @@
 const prisma = require('../config/db');
-const { syncLoanInterestRecords } = require('../services/interestService');
+const { syncLoanInterestRecords, getDueDatesForLoan } = require('../services/interestService');
+const { toPaise, fromPaise, parseAmountPaise } = require('../lib/money');
+const { todayIST, toDateOnly, toDbDate, isValidDateStr } = require('../lib/dates');
+const { HttpError } = require('../lib/errors');
+
+const httpError = (res, error) => res.status(error.status).json({ error: error.message });
 
 async function createLoan(req, res) {
   try {
@@ -11,20 +16,18 @@ async function createLoan(req, res) {
       });
     }
 
-    const start = new Date(startDate);
-    if (isNaN(start.getTime())) {
+    if (!isValidDateStr(startDate)) {
       return res.status(400).json({ error: 'Invalid start date format' });
     }
 
-    const dueDay = start.getDate();
-
     const newLoan = await prisma.loan.create({
       data: {
+        ownerId: req.user.userId,
         borrowerId: Number(borrowerId),
-        principal: Number(principal),
-        monthlyInterest: Number(monthlyInterest),
-        startDate: start,
-        dueDay: dueDay,
+        principal: fromPaise(parseAmountPaise(principal)),
+        monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)),
+        startDate: toDbDate(startDate),
+        dueDay: Number(startDate.slice(8, 10)),
         status: 'ACTIVE',
         notes: notes || null,
       },
@@ -40,6 +43,7 @@ async function createLoan(req, res) {
 
     return res.status(201).json(loanWithRecords);
   } catch (error) {
+    if (error instanceof HttpError) return httpError(res, error);
     console.error('Error creating loan:', error);
     return res.status(500).json({ error: 'Failed to create loan' });
   }
@@ -50,18 +54,35 @@ async function updateLoan(req, res) {
     const { id } = req.params;
     const { principal, monthlyInterest, startDate, notes } = req.body;
 
-    const start = startDate ? new Date(startDate) : undefined;
-    const dueDay = start ? start.getDate() : undefined;
+    if (startDate && !isValidDateStr(startDate)) {
+      return res.status(400).json({ error: 'Invalid start date format' });
+    }
+
+    const existing = await prisma.loan.findUnique({ where: { id: Number(id) } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
 
     const updatedLoan = await prisma.loan.update({
       where: { id: Number(id) },
       data: {
-        ...(principal !== undefined && { principal: Number(principal) }),
-        ...(monthlyInterest !== undefined && { monthlyInterest: Number(monthlyInterest) }),
-        ...(start && { startDate: start, dueDay }),
+        ...(principal !== undefined && { principal: fromPaise(parseAmountPaise(principal)) }),
+        ...(monthlyInterest !== undefined && { monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)) }),
+        ...(startDate && { startDate: toDbDate(startDate), dueDay: Number(startDate.slice(8, 10)) }),
         ...(notes !== undefined && { notes }),
       },
     });
+
+    // Start date moved: drop unpaid dues that are no longer on the schedule. Dues with any payment are kept.
+    if (startDate && startDate !== toDateOnly(existing.startDate)) {
+      await prisma.interestRecord.deleteMany({
+        where: {
+          loanId: updatedLoan.id,
+          paidAmount: 0,
+          dueDate: { notIn: getDueDatesForLoan(startDate, todayIST()).map(toDbDate) },
+        },
+      });
+    }
 
     if (updatedLoan.status === 'ACTIVE') {
       await syncLoanInterestRecords(updatedLoan.id);
@@ -69,6 +90,7 @@ async function updateLoan(req, res) {
 
     return res.json(updatedLoan);
   } catch (error) {
+    if (error instanceof HttpError) return httpError(res, error);
     console.error('Error updating loan:', error);
     return res.status(500).json({ error: 'Failed to update loan details' });
   }
@@ -127,8 +149,8 @@ async function clearInterestRecord(req, res) {
       return res.status(404).json({ error: 'Interest record not found' });
     }
 
-    const pendingAmount = record.amount - record.paidAmount;
-    if (pendingAmount <= 0) {
+    const pendingPaise = toPaise(record.amount) - toPaise(record.paidAmount);
+    if (pendingPaise <= 0) {
       return res.status(400).json({ error: 'This record is already fully paid' });
     }
 
@@ -136,9 +158,10 @@ async function clearInterestRecord(req, res) {
     await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
+          ownerId: record.ownerId,
           borrowerId: record.loan.borrowerId,
           loanId: record.loanId,
-          amount: pendingAmount,
+          amount: fromPaise(pendingPaise),
           paymentDate: new Date(),
           notes: `Cleared due for ${record.periodName}`,
         },
@@ -154,9 +177,10 @@ async function clearInterestRecord(req, res) {
 
       await tx.paymentAllocation.create({
         data: {
+          ownerId: record.ownerId,
           paymentId: payment.id,
           interestRecordId: record.id,
-          amount: pendingAmount,
+          amount: fromPaise(pendingPaise),
         },
       });
     });

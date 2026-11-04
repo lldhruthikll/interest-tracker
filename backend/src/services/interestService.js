@@ -1,57 +1,30 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/db');
+const { toPaise, fromPaise } = require('../lib/money');
+const { todayIST, toDateOnly, toDbDate, periodOf, addMonths, clampDay } = require('../lib/dates');
+const { planFifo } = require('./allocation');
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 /**
- * Calculates due dates for a loan from start date up to targetDate (defaults to today).
- * For example: Start date = March 15.
- * First due date = April 15 (April interest).
- * Second due date = May 15 (May interest).
- * Third due date = June 15 (June interest).
+ * Due dates ('YYYY-MM-DD') for a loan from the month after start up to targetDateStr (inclusive).
+ * Start 2026-03-15 → 2026-04-15, 2026-05-15, ...; days past month end clamp (Jan 31 → Feb 28).
  */
-function getDueDatesForLoan(startDate, targetDate = new Date()) {
+function getDueDatesForLoan(startDateStr, targetDateStr = todayIST()) {
+  const day = Number(startDateStr.slice(8, 10));
   const dueDates = [];
-  const start = new Date(startDate);
-  const target = new Date(targetDate);
-
-  // Normalise target to end of day to include due dates on target day
-  target.setHours(23, 59, 59, 999);
-
-  // JavaScript months are 0-indexed in new Date(year, month, day).
-  // start.getMonth() + 1 gives the *next* month in 0-indexed terms, which is the first due month.
-  let year = start.getFullYear();
-  let month = start.getMonth() + 1; // e.g. start in Aug (7) → month=8 (Sep)
-  const targetDay = start.getDate();
-
-  // Handle December start: month becomes 12, which wraps to January of the next year
-  if (month > 11) {
-    month = 0;
-    year++;
+  for (let period = addMonths(periodOf(startDateStr), 1); ; period = addMonths(period, 1)) {
+    const due = clampDay(period, day);
+    if (due > targetDateStr) break;
+    dueDates.push(due);
   }
-
-  while (true) {
-    // new Date(year, month+1, 0) gives the last day of `month` (0-indexed)
-    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-    const actualDay = Math.min(targetDay, lastDayOfMonth);
-    const dueDate = new Date(year, month, actualDay, 0, 0, 0, 0);
-
-    if (dueDate > target) {
-      break;
-    }
-
-    dueDates.push(dueDate);
-
-    month++;
-    if (month > 11) {
-      month = 0;
-      year++;
-    }
-  }
-
   return dueDates;
 }
 
 /**
- * Synchronises interest records for a specific loan up to today.
+ * Synchronises interest records for a specific loan up to today (IST).
  */
 async function syncLoanInterestRecords(loanId, db = prisma) {
   const loan = await db.loan.findUnique({
@@ -63,34 +36,21 @@ async function syncLoanInterestRecords(loanId, db = prisma) {
     return;
   }
 
-  const expectedDueDates = getDueDatesForLoan(loan.startDate, new Date());
-  const existingRecordsMap = new Map();
+  const existing = new Set(loan.interestRecords.map((r) => toDateOnly(r.dueDate)));
 
-  loan.interestRecords.forEach((record) => {
-    const key = new Date(record.dueDate).toISOString().split('T')[0];
-    existingRecordsMap.set(key, record);
-  });
-
-  for (const dueDate of expectedDueDates) {
-    const key = dueDate.toISOString().split('T')[0];
-    if (!existingRecordsMap.has(key)) {
-      const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
-      const periodName = `${monthNames[dueDate.getMonth()]} ${dueDate.getFullYear()}`;
-
-      await db.interestRecord.create({
-        data: {
-          loanId: loan.id,
-          dueDate: dueDate,
-          periodName: periodName,
-          amount: loan.monthlyInterest,
-          paidAmount: 0,
-          status: 'PENDING',
-        },
-      });
-    }
+  for (const due of getDueDatesForLoan(toDateOnly(loan.startDate), todayIST())) {
+    if (existing.has(due)) continue;
+    await db.interestRecord.create({
+      data: {
+        ownerId: loan.ownerId,
+        loanId: loan.id,
+        dueDate: toDbDate(due),
+        periodName: `${MONTH_NAMES[Number(due.slice(5, 7)) - 1]} ${due.slice(0, 4)}`,
+        amount: loan.monthlyInterest,
+        paidAmount: 0,
+        status: 'PENDING',
+      },
+    });
   }
 }
 
@@ -108,86 +68,76 @@ async function syncAllActiveLoans(db = prisma) {
 }
 
 /**
- * Automatically allocates a payment to the oldest pending interest records first (FIFO).
+ * Syncs dues, then allocates amountPaise of an existing payment FIFO (oldest due first).
+ * Must run inside a transaction (tx). Returns { allocations, leftoverPaise }.
  */
-async function allocatePaymentFIFO({ borrowerId, loanId, amount, notes, paymentDate = new Date() }) {
-  const numAmount = Number(amount);
-  if (isNaN(numAmount) || numAmount <= 0) {
-    throw new Error('Payment amount must be a positive number');
+async function applyPaymentFIFO(tx, { paymentId, ownerId, borrowerId, loanId, amountPaise }) {
+  if (loanId) {
+    await syncLoanInterestRecords(loanId, tx);
+  } else {
+    const loans = await tx.loan.findMany({ where: { borrowerId, status: 'ACTIVE' } });
+    for (const l of loans) {
+      await syncLoanInterestRecords(l.id, tx);
+    }
   }
 
-  return await prisma.$transaction(async (tx) => {
-    // Synchronise interest records first to ensure all accrued interest exists
-    if (loanId) {
-      await syncLoanInterestRecords(loanId, tx);
-    } else {
-      const loans = await tx.loan.findMany({ where: { borrowerId: Number(borrowerId), status: 'ACTIVE' } });
-      for (const l of loans) {
-        await syncLoanInterestRecords(l.id, tx);
-      }
-    }
-
-    // Find all pending or partially paid interest records ordered by dueDate ASC (oldest first)
-    const whereCondition = {
+  const pendingRecords = await tx.interestRecord.findMany({
+    where: {
       status: { in: ['PENDING', 'PARTIALLY_PAID'] },
-      loan: {
-        borrowerId: Number(borrowerId),
-        ...(loanId ? { id: Number(loanId) } : {}),
+      loan: { borrowerId, ...(loanId ? { id: loanId } : {}) },
+    },
+    orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+  });
+
+  const byId = new Map(pendingRecords.map((r) => [r.id, r]));
+  const plan = planFifo(
+    pendingRecords.map((r) => ({ id: r.id, amountPaise: toPaise(r.amount), paidPaise: toPaise(r.paidAmount) })),
+    amountPaise
+  );
+
+  const allocations = [];
+  for (const { dueId, amountPaise: allocated } of plan.allocations) {
+    const record = byId.get(dueId);
+    const newPaid = toPaise(record.paidAmount) + allocated;
+    await tx.interestRecord.update({
+      where: { id: dueId },
+      data: {
+        paidAmount: fromPaise(newPaid),
+        status: newPaid >= toPaise(record.amount) ? 'PAID' : 'PARTIALLY_PAID',
       },
-    };
-
-    const pendingRecords = await tx.interestRecord.findMany({
-      where: whereCondition,
-      orderBy: { dueDate: 'asc' },
-      include: { loan: true },
     });
+    allocations.push(await tx.paymentAllocation.create({
+      data: { ownerId, paymentId, interestRecordId: dueId, amount: fromPaise(allocated) },
+    }));
+  }
 
-    // Record the main payment entry
+  return { allocations, leftoverPaise: plan.leftoverPaise };
+}
+
+/**
+ * Records a payment and allocates it to the oldest pending interest records first (FIFO).
+ */
+async function allocatePaymentFIFO({ ownerId, borrowerId, loanId, amountPaise, notes, paymentDate = new Date() }) {
+  return await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.create({
       data: {
-        borrowerId: Number(borrowerId),
-        loanId: loanId ? Number(loanId) : null,
-        amount: numAmount,
+        ownerId,
+        borrowerId,
+        loanId: loanId || null,
+        amount: fromPaise(amountPaise),
         paymentDate: new Date(paymentDate),
         notes: notes || null,
       },
     });
 
-    let remainingPayment = numAmount;
-    const allocations = [];
-
-    for (const record of pendingRecords) {
-      if (remainingPayment <= 0) break;
-
-      const needed = record.amount - record.paidAmount;
-      const allocated = Math.min(remainingPayment, needed);
-      const newPaidAmount = record.paidAmount + allocated;
-      const newStatus = newPaidAmount >= record.amount ? 'PAID' : 'PARTIALLY_PAID';
-
-      await tx.interestRecord.update({
-        where: { id: record.id },
-        data: {
-          paidAmount: newPaidAmount,
-          status: newStatus,
-        },
-      });
-
-      const allocation = await tx.paymentAllocation.create({
-        data: {
-          paymentId: payment.id,
-          interestRecordId: record.id,
-          amount: allocated,
-        },
-      });
-
-      allocations.push(allocation);
-      remainingPayment -= allocated;
-    }
+    const { allocations, leftoverPaise } = await applyPaymentFIFO(tx, {
+      paymentId: payment.id, ownerId, borrowerId, loanId, amountPaise,
+    });
 
     return {
       payment,
       allocations,
-      remainingPayment, // If > 0, customer overpaid or paid ahead of due dates
+      remainingPayment: leftoverPaise / 100, // If > 0, customer overpaid or paid ahead of due dates
     };
   });
 }
@@ -196,5 +146,6 @@ module.exports = {
   getDueDatesForLoan,
   syncLoanInterestRecords,
   syncAllActiveLoans,
+  applyPaymentFIFO,
   allocatePaymentFIFO,
 };

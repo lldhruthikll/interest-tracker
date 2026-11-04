@@ -1,5 +1,15 @@
 const prisma = require('../config/db');
-const { syncLoanInterestRecords, getDueDatesForLoan } = require('../services/interestService');
+const { syncLoanInterestRecords } = require('../services/interestService');
+const { toPaise } = require('../lib/money');
+const { todayIST, toDbDate, periodOf, addMonths, clampDay } = require('../lib/dates');
+
+// Next due date for a loan's due day, today (IST) counting as not yet passed.
+function nextDueFor(dueDay, today) {
+  const thisMonth = clampDay(periodOf(today), dueDay);
+  return thisMonth >= today ? thisMonth : clampDay(addMonths(periodOf(today), 1), dueDay);
+}
+
+const pendingPaise = (records) => records.reduce((sum, r) => sum + toPaise(r.amount) - toPaise(r.paidAmount), 0);
 
 async function getBorrowers(req, res) {
   try {
@@ -33,17 +43,18 @@ async function getBorrowers(req, res) {
     // Sync interest records for active loans and format response
     const formattedBorrowers = await Promise.all(
       borrowers.map(async (borrower) => {
-        let totalPrincipal = 0;
-        let totalMonthlyInterest = 0;
-        let totalPendingInterest = 0;
+        let totalPrincipal = 0; // paise
+        let totalMonthlyInterest = 0; // paise
+        let totalPendingInterest = 0; // paise
         let activeLoansCount = 0;
         let earliestNextDueDate = null;
+        const today = todayIST();
 
         for (const loan of borrower.loans) {
           if (loan.status === 'ACTIVE') {
             activeLoansCount++;
-            totalPrincipal += loan.principal;
-            totalMonthlyInterest += loan.monthlyInterest;
+            totalPrincipal += toPaise(loan.principal);
+            totalMonthlyInterest += toPaise(loan.monthlyInterest);
 
             // Sync interest records
             await syncLoanInterestRecords(loan.id);
@@ -53,18 +64,9 @@ async function getBorrowers(req, res) {
               where: { loanId: loan.id },
             });
 
-            const pending = records.reduce((sum, r) => sum + (r.amount - r.paidAmount), 0);
-            totalPendingInterest += pending;
+            totalPendingInterest += pendingPaise(records);
 
-            // Next due date calculation
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            let nextDue = new Date(year, month, loan.dueDay);
-            if (nextDue < today) {
-              nextDue = new Date(year, month + 1, loan.dueDay);
-            }
-
+            const nextDue = nextDueFor(loan.dueDay, today);
             if (!earliestNextDueDate || nextDue < earliestNextDueDate) {
               earliestNextDueDate = nextDue;
             }
@@ -79,10 +81,10 @@ async function getBorrowers(req, res) {
           notes: borrower.notes,
           createdAt: borrower.createdAt,
           activeLoansCount,
-          totalPrincipal,
-          totalMonthlyInterest,
-          totalPendingInterest,
-          nextDueDate: earliestNextDueDate,
+          totalPrincipal: totalPrincipal / 100,
+          totalMonthlyInterest: totalMonthlyInterest / 100,
+          totalPendingInterest: totalPendingInterest / 100,
+          nextDueDate: earliestNextDueDate && toDbDate(earliestNextDueDate),
         };
       })
     );
@@ -158,32 +160,25 @@ async function getBorrowerById(req, res) {
       },
     });
 
-    let totalPrincipal = 0;
-    let totalMonthlyInterest = 0;
-    let totalPendingAmount = 0;
+    let totalPrincipal = 0; // paise
+    let totalMonthlyInterest = 0; // paise
+    let totalPendingAmount = 0; // paise
     let earliestNextDueDate = null;
+    const today = todayIST();
 
     const formattedLoans = updatedBorrower.loans.map((loan) => {
       const isLoanActive = loan.status === 'ACTIVE';
       if (isLoanActive) {
-        totalPrincipal += loan.principal;
-        totalMonthlyInterest += loan.monthlyInterest;
+        totalPrincipal += toPaise(loan.principal);
+        totalMonthlyInterest += toPaise(loan.monthlyInterest);
       }
 
-      const pendingForLoan = loan.interestRecords.reduce(
-        (sum, r) => sum + (r.amount - r.paidAmount),
-        0
-      );
+      const pendingForLoan = pendingPaise(loan.interestRecords);
       if (isLoanActive) {
         totalPendingAmount += pendingForLoan;
       }
 
-      // Next due date for this loan
-      const today = new Date();
-      let nextDue = new Date(today.getFullYear(), today.getMonth(), loan.dueDay);
-      if (nextDue < today) {
-        nextDue = new Date(today.getFullYear(), today.getMonth() + 1, loan.dueDay);
-      }
+      const nextDue = nextDueFor(loan.dueDay, today);
 
       if (isLoanActive && (!earliestNextDueDate || nextDue < earliestNextDueDate)) {
         earliestNextDueDate = nextDue;
@@ -191,8 +186,8 @@ async function getBorrowerById(req, res) {
 
       return {
         ...loan,
-        pendingAmount: pendingForLoan,
-        nextDueDate: nextDue,
+        pendingAmount: pendingForLoan / 100,
+        nextDueDate: toDbDate(nextDue),
       };
     });
 
@@ -200,10 +195,10 @@ async function getBorrowerById(req, res) {
       ...updatedBorrower,
       loans: formattedLoans,
       summary: {
-        totalPrincipal,
-        totalMonthlyInterest,
-        totalPendingAmount,
-        nextDueDate: earliestNextDueDate,
+        totalPrincipal: totalPrincipal / 100,
+        totalMonthlyInterest: totalMonthlyInterest / 100,
+        totalPendingAmount: totalPendingAmount / 100,
+        nextDueDate: earliestNextDueDate && toDbDate(earliestNextDueDate),
       },
     });
   } catch (error) {
@@ -222,6 +217,7 @@ async function createBorrower(req, res) {
 
     const newBorrower = await prisma.borrower.create({
       data: {
+        ownerId: req.user.userId,
         name,
         phone,
         address: address || null,

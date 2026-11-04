@@ -9,15 +9,27 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
-  name      String   @default("Admin")
-  createdAt DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  password           String
+  name               String   @default("Admin")
+  createdAt          DateTime @default(now())
+  role               String   @default("MEMBER") // ADMIN, MEMBER, PAYER
+  active             Boolean  @default(true)
+  mustChangePassword Boolean  @default(false)
+  payerId            Int?     @unique
+
+  borrowers          Borrower[]
+  loans              Loan[]
+  interestRecords    InterestRecord[]
+  payments           Payment[]
+  paymentAllocations PaymentAllocation[]
 }
 
 model Borrower {
   id        Int       @id @default(autoincrement())
+  ownerId   Int
+  owner     User      @relation(fields: [ownerId], references: [id])
   name      String
   phone     String
   address   String?
@@ -26,59 +38,76 @@ model Borrower {
   updatedAt DateTime  @updatedAt
   loans     Loan[]
   payments  Payment[]
+
+  @@index([ownerId])
 }
 
 model Loan {
   id              Int              @id @default(autoincrement())
+  ownerId         Int
+  owner           User             @relation(fields: [ownerId], references: [id])
   borrowerId      Int
   borrower        Borrower         @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
-  principal       Float
-  monthlyInterest Float
-  startDate       DateTime
-  dueDay          Int              // Day of the month (1-31)
+  principal       Decimal          @db.Decimal(12, 2)
+  monthlyInterest Decimal          @db.Decimal(12, 2)
+  startDate       DateTime         @db.Date
+  dueDay          Int // Day of the month (1-31)
   status          String           @default("ACTIVE") // ACTIVE, CLOSED
   notes           String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   interestRecords InterestRecord[]
   payments        Payment[]
+
+  @@index([ownerId])
 }
 
 model InterestRecord {
   id          Int                 @id @default(autoincrement())
+  ownerId     Int
+  owner       User                @relation(fields: [ownerId], references: [id])
   loanId      Int
   loan        Loan                @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  dueDate     DateTime
-  periodName  String              // e.g. "April 2026"
-  amount      Float               // Monthly interest amount expected
-  paidAmount  Float               @default(0)
+  dueDate     DateTime            @db.Date
+  periodName  String // e.g. "April 2026"
+  amount      Decimal             @db.Decimal(12, 2) // Monthly interest amount expected
+  paidAmount  Decimal             @default(0) @db.Decimal(12, 2)
   status      String              @default("PENDING") // PENDING, PARTIALLY_PAID, PAID
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   allocations PaymentAllocation[]
 
   @@unique([loanId, dueDate])
+  @@index([ownerId])
 }
 
 model Payment {
   id          Int                 @id @default(autoincrement())
+  ownerId     Int
+  owner       User                @relation(fields: [ownerId], references: [id])
   borrowerId  Int
   borrower    Borrower            @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
   loanId      Int?
   loan        Loan?               @relation(fields: [loanId], references: [id], onDelete: SetNull)
-  amount      Float               // Total payment amount entered
+  amount      Decimal             @db.Decimal(12, 2) // Total payment amount entered
   paymentDate DateTime            @default(now())
   notes       String?
   createdAt   DateTime            @default(now())
   allocations PaymentAllocation[]
+
+  @@index([ownerId])
 }
 
 model PaymentAllocation {
   id               Int            @id @default(autoincrement())
+  ownerId          Int
+  owner            User           @relation(fields: [ownerId], references: [id])
   paymentId        Int
   payment          Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   interestRecordId Int
   interestRecord   InterestRecord @relation(fields: [interestRecordId], references: [id], onDelete: Cascade)
-  amount           Float          // Amount allocated to this monthly interest record
+  amount           Decimal        @db.Decimal(12, 2) // Amount allocated to this monthly interest record
   createdAt        DateTime       @default(now())
+
+  @@index([ownerId])
 }

@@ -1,5 +1,7 @@
 const prisma = require('../config/db');
-const { allocatePaymentFIFO, syncLoanInterestRecords } = require('../services/interestService');
+const { allocatePaymentFIFO, applyPaymentFIFO } = require('../services/interestService');
+const { toPaise, fromPaise, parseAmountPaise } = require('../lib/money');
+const { HttpError } = require('../lib/errors');
 
 async function recordPayment(req, res) {
   try {
@@ -9,15 +11,11 @@ async function recordPayment(req, res) {
       return res.status(400).json({ error: 'Borrower ID and Amount are required' });
     }
 
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: 'Payment amount must be a positive number' });
-    }
-
     const result = await allocatePaymentFIFO({
+      ownerId: req.user.userId,
       borrowerId: Number(borrowerId),
       loanId: loanId ? Number(loanId) : null,
-      amount: numAmount,
+      amountPaise: parseAmountPaise(amount),
       notes,
       paymentDate: paymentDate || new Date(),
     });
@@ -29,6 +27,7 @@ async function recordPayment(req, res) {
       remainingUnallocatedPayment: result.remainingPayment,
     });
   } catch (error) {
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
     console.error('Error recording payment:', error);
     return res.status(500).json({ error: error.message || 'Failed to record payment' });
   }
@@ -93,11 +92,11 @@ async function reversePaymentAllocations(paymentId, tx) {
 
     if (!interestRecord) continue;
 
-    const newPaidAmount = otherAllocations.reduce((sum, a) => sum + a.amount, 0);
+    const newPaidPaise = otherAllocations.reduce((sum, a) => sum + toPaise(a.amount), 0);
     let newStatus;
-    if (newPaidAmount <= 0) {
+    if (newPaidPaise <= 0) {
       newStatus = 'PENDING';
-    } else if (newPaidAmount >= interestRecord.amount) {
+    } else if (newPaidPaise >= toPaise(interestRecord.amount)) {
       newStatus = 'PAID';
     } else {
       newStatus = 'PARTIALLY_PAID';
@@ -105,7 +104,7 @@ async function reversePaymentAllocations(paymentId, tx) {
 
     await tx.interestRecord.update({
       where: { id: alloc.interestRecordId },
-      data: { paidAmount: newPaidAmount, status: newStatus },
+      data: { paidAmount: fromPaise(newPaidPaise), status: newStatus },
     });
   }
 }
@@ -142,79 +141,32 @@ async function updatePayment(req, res) {
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return res.status(400).json({ error: 'Payment amount must be a positive number' });
-    }
+    const amountPaise = parseAmountPaise(amount);
 
-    // Step 1: Reverse old allocations + delete them + update payment fields
+    // Reverse old allocations, update the payment, then re-run FIFO, all in one transaction.
     await prisma.$transaction(async (tx) => {
       await reversePaymentAllocations(id, tx);
       await tx.paymentAllocation.deleteMany({ where: { paymentId: Number(id) } });
       await tx.payment.update({
         where: { id: Number(id) },
         data: {
-          amount: numAmount,
+          amount: fromPaise(amountPaise),
           notes: notes !== undefined ? (notes || null) : payment.notes,
           paymentDate: paymentDate ? new Date(paymentDate) : payment.paymentDate,
         },
       });
-    });
-
-    // Step 2: Re-run FIFO allocation against the updated payment in a fresh transaction
-    await prisma.$transaction(async (tx) => {
-      if (payment.loanId) {
-        await syncLoanInterestRecords(payment.loanId, tx);
-      } else {
-        const loans = await tx.loan.findMany({
-          where: { borrowerId: payment.borrowerId, status: 'ACTIVE' },
-        });
-        for (const l of loans) {
-          await syncLoanInterestRecords(l.id, tx);
-        }
-      }
-
-      const pendingRecords = await tx.interestRecord.findMany({
-        where: {
-          status: { in: ['PENDING', 'PARTIALLY_PAID'] },
-          loan: {
-            borrowerId: payment.borrowerId,
-            ...(payment.loanId ? { id: payment.loanId } : {}),
-          },
-        },
-        orderBy: { dueDate: 'asc' },
-        include: { loan: true },
+      await applyPaymentFIFO(tx, {
+        paymentId: payment.id,
+        ownerId: payment.ownerId,
+        borrowerId: payment.borrowerId,
+        loanId: payment.loanId,
+        amountPaise,
       });
-
-      let remainingPayment = numAmount;
-
-      for (const record of pendingRecords) {
-        if (remainingPayment <= 0) break;
-
-        const needed = record.amount - record.paidAmount;
-        const allocated = Math.min(remainingPayment, needed);
-        const newPaidAmount = record.paidAmount + allocated;
-        const newStatus = newPaidAmount >= record.amount ? 'PAID' : 'PARTIALLY_PAID';
-
-        await tx.interestRecord.update({
-          where: { id: record.id },
-          data: { paidAmount: newPaidAmount, status: newStatus },
-        });
-
-        await tx.paymentAllocation.create({
-          data: {
-            paymentId: Number(id),
-            interestRecordId: record.id,
-            amount: allocated,
-          },
-        });
-
-        remainingPayment -= allocated;
-      }
     });
 
     return res.json({ message: 'Payment updated and reallocated successfully' });
   } catch (error) {
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
     console.error('Error updating payment:', error);
     return res.status(500).json({ error: error.message || 'Failed to update payment' });
   }

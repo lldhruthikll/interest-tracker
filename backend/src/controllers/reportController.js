@@ -1,6 +1,8 @@
 const XLSX = require('xlsx');
 const prisma = require('../config/db');
 const { syncAllActiveLoans } = require('../services/interestService');
+const { toPaise } = require('../lib/money');
+const { todayIST, toDateOnly } = require('../lib/dates');
 
 async function exportExcelReport(req, res) {
   try {
@@ -25,13 +27,13 @@ async function exportExcelReport(req, res) {
     const pendingData = pendingRecords.map((r) => ({
       'Borrower Name': r.loan.borrower.name,
       'Phone': r.loan.borrower.phone,
-      'Loan Principal (₹)': r.loan.principal,
-      'Monthly Interest (₹)': r.loan.monthlyInterest,
+      'Loan Principal (₹)': Number(r.loan.principal),
+      'Monthly Interest (₹)': Number(r.loan.monthlyInterest),
       'Period': r.periodName,
-      'Due Date': new Date(r.dueDate).toISOString().split('T')[0],
-      'Expected Amount (₹)': r.amount,
-      'Paid Amount (₹)': r.paidAmount,
-      'Pending Amount (₹)': r.amount - r.paidAmount,
+      'Due Date': toDateOnly(r.dueDate),
+      'Expected Amount (₹)': Number(r.amount),
+      'Paid Amount (₹)': Number(r.paidAmount),
+      'Pending Amount (₹)': (toPaise(r.amount) - toPaise(r.paidAmount)) / 100,
       'Status': r.status,
     }));
 
@@ -46,15 +48,15 @@ async function exportExcelReport(req, res) {
 
     const loansData = loans.map((l) => {
       const totalPending = l.interestRecords.reduce(
-        (sum, r) => sum + (r.amount - r.paidAmount),
+        (sum, r) => sum + toPaise(r.amount) - toPaise(r.paidAmount),
         0
-      );
+      ) / 100;
       return {
         'Borrower Name': l.borrower.name,
         'Phone': l.borrower.phone,
-        'Principal Amount (₹)': l.principal,
-        'Monthly Interest (₹)': l.monthlyInterest,
-        'Start Date': new Date(l.startDate).toISOString().split('T')[0],
+        'Principal Amount (₹)': Number(l.principal),
+        'Monthly Interest (₹)': Number(l.monthlyInterest),
+        'Start Date': toDateOnly(l.startDate),
         'Due Day of Month': l.dueDay,
         'Status': l.status,
         'Total Pending Interest (₹)': totalPending,
@@ -83,7 +85,7 @@ async function exportExcelReport(req, res) {
         'Date': new Date(p.paymentDate).toISOString().split('T')[0],
         'Borrower Name': p.borrower.name,
         'Phone': p.borrower.phone,
-        'Total Amount Paid (₹)': p.amount,
+        'Total Amount Paid (₹)': Number(p.amount),
         'Allocated To Periods': periods || 'Unallocated / General',
         'Notes': p.notes || '',
       };
@@ -110,7 +112,7 @@ async function exportExcelReport(req, res) {
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename=Interest_Collection_Report_${new Date().toISOString().split('T')[0]}.xlsx`
+      `attachment; filename=Interest_Collection_Report_${todayIST()}.xlsx`
     );
 
     return res.send(buffer);

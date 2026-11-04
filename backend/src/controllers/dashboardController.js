@@ -1,21 +1,16 @@
 const prisma = require('../config/db');
 const { syncAllActiveLoans } = require('../services/interestService');
+const { toPaise } = require('../lib/money');
+const { todayIST, addDays, toDateOnly, toDbDate, clampDay } = require('../lib/dates');
 
 async function getDashboardStats(req, res) {
   try {
     // Sync all active loans before compiling dashboard metrics
     await syncAllActiveLoans();
 
-    // Use UTC-based date strings for stable timezone-independent comparisons.
-    // Prisma/Postgres stores dueDate as UTC midnight; comparing via toISOString()
-    // avoids timezone-shift bugs where a date near midnight shifts to the wrong day.
-    const nowUtc = new Date();
-    const todayStr = nowUtc.toISOString().split('T')[0]; // e.g. '2026-08-17'
-
-    // Calculate the date string 7 days from today
-    const sevenDaysLater = new Date(nowUtc);
-    sevenDaysLater.setUTCDate(sevenDaysLater.getUTCDate() + 7);
-    const sevenDaysLaterStr = sevenDaysLater.toISOString().split('T')[0];
+    // Due dates are date-only values; compare 'YYYY-MM-DD' strings against today in IST.
+    const todayStr = todayIST();
+    const sevenDaysLaterStr = addDays(todayStr, 7);
 
     // Fetch active loans with borrower and interest records
     const activeLoans = await prisma.loan.findMany({
@@ -28,11 +23,11 @@ async function getDashboardStats(req, res) {
       },
     });
 
-    let totalPrincipalLent = 0;
+    let totalPrincipalLent = 0; // paise
     let totalActiveLoans = activeLoans.length;
-    let totalPendingInterest = 0;
+    let totalPendingInterest = 0; // paise
 
-    let todaysDueAmount = 0;
+    let todaysDueAmount = 0; // paise
     let todaysDueCount = 0;
     const todaysDueList = [];
 
@@ -41,15 +36,15 @@ async function getDashboardStats(req, res) {
     const calendarEvents = [];
 
     for (const loan of activeLoans) {
-      totalPrincipalLent += loan.principal;
+      totalPrincipalLent += toPaise(loan.principal);
 
       for (const record of loan.interestRecords) {
-        const pendingAmount = record.amount - record.paidAmount;
-        // Get the date string in UTC (matches how Prisma stores the date)
-        const recordDateStr = new Date(record.dueDate).toISOString().split('T')[0];
+        const pendingPaise = toPaise(record.amount) - toPaise(record.paidAmount);
+        const pendingAmount = pendingPaise / 100;
+        const recordDateStr = toDateOnly(record.dueDate);
 
-        if (pendingAmount > 0) {
-          totalPendingInterest += pendingAmount;
+        if (pendingPaise > 0) {
+          totalPendingInterest += pendingPaise;
         }
 
         // Calendar event metadata (include all records for the calendar view)
@@ -68,7 +63,7 @@ async function getDashboardStats(req, res) {
 
         // Check if Due Today
         if (recordDateStr === todayStr && pendingAmount > 0) {
-          todaysDueAmount += pendingAmount;
+          todaysDueAmount += pendingPaise;
           todaysDueCount++;
           todaysDueList.push({
             recordId: record.id,
@@ -86,7 +81,7 @@ async function getDashboardStats(req, res) {
         // Check if Overdue (due date is before today and has a pending balance)
         if (recordDateStr < todayStr && pendingAmount > 0) {
           const dayDiff = Math.floor(
-            (new Date(todayStr) - new Date(recordDateStr)) / (1000 * 60 * 60 * 24)
+            (toDbDate(todayStr) - toDbDate(recordDateStr)) / (1000 * 60 * 60 * 24)
           );
           overdueList.push({
             recordId: record.id,
@@ -121,13 +116,13 @@ async function getDashboardStats(req, res) {
 
     return res.json({
       summary: {
-        todaysDueAmount,
+        todaysDueAmount: todaysDueAmount / 100,
         todaysDueCount,
         overdueCount: overdueList.length,
-        totalOverdueAmount: overdueList.reduce((sum, item) => sum + item.pendingAmount, 0),
+        totalOverdueAmount: overdueList.reduce((sum, item) => sum + toPaise(item.pendingAmount), 0) / 100,
         upcomingCount: upcomingList.length,
-        totalPendingInterest,
-        totalPrincipalLent,
+        totalPendingInterest: totalPendingInterest / 100,
+        totalPrincipalLent: totalPrincipalLent / 100,
         totalActiveLoans,
       },
       todaysDue: todaysDueList,
@@ -143,9 +138,9 @@ async function getDashboardStats(req, res) {
 
 async function getMonthlyAnalytics(req, res) {
   try {
-    const now = new Date();
-    const year = parseInt(req.query.year) || now.getFullYear();
-    const month = req.query.month ? parseInt(req.query.month) : now.getMonth() + 1;
+    const today = todayIST();
+    const year = parseInt(req.query.year) || Number(today.slice(0, 4));
+    const month = req.query.month ? parseInt(req.query.month) : Number(today.slice(5, 7));
 
     // --- 12-Month Trend (raw SQL for month grouping) ---
     const trend = await prisma.$queryRaw`
@@ -179,12 +174,11 @@ async function getMonthlyAnalytics(req, res) {
     }
 
     // --- Selected Month Summary ---
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    const period = `${year}-${String(month).padStart(2, '0')}`;
 
     const selectedRecords = await prisma.interestRecord.findMany({
       where: {
-        dueDate: { gte: startOfMonth, lte: endOfMonth },
+        dueDate: { gte: toDbDate(`${period}-01`), lte: toDbDate(clampDay(period, 31)) },
       },
       include: {
         loan: {
@@ -193,10 +187,11 @@ async function getMonthlyAnalytics(req, res) {
       },
     });
 
+    const sumPaise = (f) => selectedRecords.reduce((s, r) => s + f(r), 0);
     const selectedMonthSummary = {
-      totalExpected: selectedRecords.reduce((s, r) => s + r.amount, 0),
-      totalCollected: selectedRecords.reduce((s, r) => s + r.paidAmount, 0),
-      totalPending: selectedRecords.reduce((s, r) => s + (r.amount - r.paidAmount), 0),
+      totalExpected: sumPaise((r) => toPaise(r.amount)) / 100,
+      totalCollected: sumPaise((r) => toPaise(r.paidAmount)) / 100,
+      totalPending: sumPaise((r) => toPaise(r.amount) - toPaise(r.paidAmount)) / 100,
       totalRecords: selectedRecords.length,
     };
 
@@ -214,12 +209,18 @@ async function getMonthlyAnalytics(req, res) {
           totalPending: 0,
         };
       }
-      borrowerMap[borrower.id].totalExpected += record.amount;
-      borrowerMap[borrower.id].totalCollected += record.paidAmount;
-      borrowerMap[borrower.id].totalPending += record.amount - record.paidAmount;
+      // paise here; converted to rupees below
+      borrowerMap[borrower.id].totalExpected += toPaise(record.amount);
+      borrowerMap[borrower.id].totalCollected += toPaise(record.paidAmount);
+      borrowerMap[borrower.id].totalPending += toPaise(record.amount) - toPaise(record.paidAmount);
     }
 
-    const borrowerBreakdown = Object.values(borrowerMap).sort(
+    const borrowerBreakdown = Object.values(borrowerMap).map((b) => ({
+      ...b,
+      totalExpected: b.totalExpected / 100,
+      totalCollected: b.totalCollected / 100,
+      totalPending: b.totalPending / 100,
+    })).sort(
       (a, b) => b.totalPending - a.totalPending
     );
 
