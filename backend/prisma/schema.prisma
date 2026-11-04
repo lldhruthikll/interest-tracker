@@ -18,9 +18,20 @@ model User {
   active             Boolean  @default(true)
   mustChangePassword Boolean  @default(false)
   payerId            Int?     @unique
+  payer              Payer?   @relation("PayerLogin", fields: [payerId], references: [id])
 
   borrowers          Borrower[]
   loans              Loan[]
+  categories         Category[]
+  places             Place[]
+  units              Unit[]
+  payers             Payer[]               @relation("PayerOwner")
+  agreements         Agreement[]
+  rateChanges        RateChange[]
+  recurringDues      RecurringDue[]
+  recurringPayments  RecurringPayment[]
+  recurringAllocs    RecurringAllocation[]
+  advanceEntries     AdvanceEntry[]
   interestRecords    InterestRecord[]
   payments           Payment[]
   paymentAllocations PaymentAllocation[]
@@ -108,6 +119,172 @@ model PaymentAllocation {
   interestRecord   InterestRecord @relation(fields: [interestRecordId], references: [id], onDelete: Cascade)
   amount           Decimal        @db.Decimal(12, 2) // Amount allocated to this monthly interest record
   createdAt        DateTime       @default(now())
+
+  @@index([ownerId])
+}
+
+model Category {
+  id         Int      @id @default(autoincrement())
+  ownerId    Int
+  owner      User     @relation(fields: [ownerId], references: [id])
+  name       String
+  placeLabel String
+  unitLabel  String
+  payerLabel String
+  color      String?
+  archived   Boolean  @default(false)
+  places     Place[]
+  createdAt  DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model Place {
+  id         Int      @id @default(autoincrement())
+  ownerId    Int
+  owner      User     @relation(fields: [ownerId], references: [id])
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+  name       String
+  address    String?
+  archived   Boolean  @default(false)
+  units      Unit[]
+  createdAt  DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model Unit {
+  id            Int         @id @default(autoincrement())
+  ownerId       Int
+  owner         User        @relation(fields: [ownerId], references: [id])
+  placeId       Int
+  place         Place       @relation(fields: [placeId], references: [id])
+  name          String
+  defaultAmount Decimal     @db.Decimal(12, 2)
+  notes         String?
+  archived      Boolean     @default(false)
+  agreements    Agreement[]
+  createdAt     DateTime    @default(now())
+
+  @@index([ownerId])
+}
+
+model Payer {
+  id         Int         @id @default(autoincrement())
+  ownerId    Int
+  owner      User        @relation("PayerOwner", fields: [ownerId], references: [id])
+  name       String
+  phone      String
+  notes      String?
+  user       User?       @relation("PayerLogin")
+  agreements Agreement[]
+  createdAt  DateTime    @default(now())
+
+  @@index([ownerId])
+}
+
+model Agreement {
+  id             Int                @id @default(autoincrement())
+  ownerId        Int
+  owner          User               @relation(fields: [ownerId], references: [id])
+  unitId         Int
+  unit           Unit               @relation(fields: [unitId], references: [id])
+  payerId        Int
+  payer          Payer              @relation(fields: [payerId], references: [id])
+  startDate      DateTime           @db.Date
+  endDate        DateTime?          @db.Date
+  dueDay         Int
+  timing         String // IN_ADVANCE, IN_ARREARS
+  firstMonthRule String // PRORATED, FULL, FREE
+  lastMonthRule  String
+  status         String             @default("ACTIVE") // ACTIVE, ENDED
+  notes          String?
+  rateChanges    RateChange[]
+  dues           RecurringDue[]
+  payments       RecurringPayment[]
+  advances       AdvanceEntry[]
+  createdAt      DateTime           @default(now())
+
+  @@index([ownerId])
+}
+
+model RateChange {
+  id            Int       @id @default(autoincrement())
+  ownerId       Int
+  owner         User      @relation(fields: [ownerId], references: [id])
+  agreementId   Int
+  agreement     Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  amount        Decimal   @db.Decimal(12, 2)
+  effectiveFrom String // YYYY-MM
+  createdAt     DateTime  @default(now())
+
+  @@unique([agreementId, effectiveFrom])
+  @@index([ownerId])
+}
+
+model RecurringDue {
+  id          Int                   @id @default(autoincrement())
+  ownerId     Int
+  owner       User                  @relation(fields: [ownerId], references: [id])
+  agreementId Int
+  agreement   Agreement             @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  period      String // YYYY-MM
+  dueDate     DateTime              @db.Date
+  amount      Decimal               @db.Decimal(12, 2)
+  paidAmount  Decimal               @default(0) @db.Decimal(12, 2)
+  status      String                @default("PENDING")
+  allocations RecurringAllocation[]
+  createdAt   DateTime              @default(now())
+
+  @@unique([agreementId, period])
+  @@index([ownerId])
+}
+
+model RecurringPayment {
+  id          Int                   @id @default(autoincrement())
+  ownerId     Int
+  owner       User                  @relation(fields: [ownerId], references: [id])
+  agreementId Int
+  agreement   Agreement             @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  amount      Decimal               @db.Decimal(12, 2)
+  paymentDate DateTime              @db.Date
+  method      String // CASH, UPI, BANK, CHEQUE, ADVANCE
+  notes       String?
+  allocations RecurringAllocation[]
+  advances    AdvanceEntry[]
+  createdAt   DateTime              @default(now())
+
+  @@index([ownerId])
+}
+
+model RecurringAllocation {
+  id        Int              @id @default(autoincrement())
+  ownerId   Int
+  owner     User             @relation(fields: [ownerId], references: [id])
+  paymentId Int
+  payment   RecurringPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  dueId     Int
+  due       RecurringDue     @relation(fields: [dueId], references: [id], onDelete: Cascade)
+  amount    Decimal          @db.Decimal(12, 2)
+  createdAt DateTime         @default(now())
+
+  @@index([ownerId])
+}
+
+model AdvanceEntry {
+  id          Int               @id @default(autoincrement())
+  ownerId     Int
+  owner       User              @relation(fields: [ownerId], references: [id])
+  agreementId Int
+  agreement   Agreement         @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  type        String // RECEIVED, APPLIED_TO_RENT, RETAINED, REFUNDED, CREDIT_REFUNDED
+  amount      Decimal           @db.Decimal(12, 2)
+  date        DateTime          @db.Date
+  notes       String?
+  paymentId   Int?
+  payment     RecurringPayment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
 
   @@index([ownerId])
 }

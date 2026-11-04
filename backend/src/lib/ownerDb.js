@@ -4,12 +4,16 @@
 const prisma = require('../config/db');
 const { NotFound } = require('./errors');
 
-const OWNED_MODELS = ['Borrower', 'Loan', 'InterestRecord', 'Payment', 'PaymentAllocation'];
+const OWNED_MODELS = ['Borrower', 'Loan', 'InterestRecord', 'Payment', 'PaymentAllocation',
+  'Category', 'Place', 'Unit', 'Payer', 'Agreement', 'RateChange', 'RecurringDue', 'RecurringPayment',
+  'RecurringAllocation', 'AdvanceEntry'];
 
 const WHERE_OPS = new Set([
   'findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate',
   'groupBy', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert',
 ]);
+
+const NO_REASSIGN = new Set(['update', 'updateMany', 'upsert']);
 
 function forOwner(ownerId) {
   return prisma.$extends({
@@ -18,6 +22,10 @@ function forOwner(ownerId) {
         $allOperations({ model, operation, args, query }) {
           if (!OWNED_MODELS.includes(model)) return query(args);
           args = { ...args };
+          if (NO_REASSIGN.has(operation)) {
+            const d = operation === 'upsert' ? args.update : args.data;
+            if (d && 'ownerId' in d) throw new Error(`ownerDb: cannot change ownerId (${model}.${operation})`);
+          }
           if (WHERE_OPS.has(operation)) args.where = { ...args.where, ownerId };
           if (operation === 'upsert') args.create = { ...args.create, ownerId };
           if (operation === 'create') args.data = { ...args.data, ownerId };
