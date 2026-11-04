@@ -41,37 +41,26 @@ A simple, fast, and modern web application built specifically for personal money
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL database (or local Docker instance)
+- Local Postgres (Docker container `interest_db`, host port **5436**, user `postgres`)
 
 ### 1. Database & Backend Setup
 
+All local backend commands go through `scripts/local.js`, which loads `.env.local` (or `.env.test`) and refuses any non-local `DATABASE_URL`. The plain `backend/.env` is not used locally.
+
 ```bash
 cd backend
-
-# Install dependencies
 npm install
+cp .env.local.example .env.local     # DATABASE_URL -> localhost:5436/finledger_v2
+cp .env.test.example .env.test       # DATABASE_URL -> localhost:5436/finledger_test
 
-# Create environment file
-cp .env.example .env
-
-# Configure your DATABASE_URL in .env:
-# DATABASE_URL="postgresql://user:password@localhost:5432/interest_db?schema=public"
-
-# Run Prisma database migration
-npx prisma db push
-
-# Generate Prisma Client
-npx prisma generate
-
-# Start backend server
-npm run dev
+node scripts/local.js npx prisma migrate deploy   # create/upgrade the dev schema
+npm run db:test:reset                             # test schema
+node scripts/local.js node scripts/create-admin.js   # empty DB only: creates the first admin
+npm run dev                                       # API on http://localhost:5000
+npm test                                          # full backend test suite
 ```
 
-The backend server will run at `http://localhost:5000`.
-
-*Default Admin Credentials*:
-- Username: `admin`
-- Password: `admin123`
+There is no default admin account. On an empty database, create one with `create-admin.js`. On the existing production database the existing user becomes `ADMIN` through the migration.
 
 ---
 
@@ -111,10 +100,12 @@ docker-compose up --build -d
 2. Go to [Render Dashboard](https://dashboard.render.com/) and create a **Web Service**.
 3. Point to the `/backend` directory.
 4. Set Build Command: `npm install && npx prisma generate`
-5. Set Start Command: `npm start`
+5. Set Start Command: `node src/index.js` (migrations are not run on start; run them manually per `docs/superpowers/runbooks/2026-11-04-finledger-v2-cutover.md`)
 6. Add Environment Variables:
    - `DATABASE_URL`: Your Neon PostgreSQL connection string (`postgresql://user:pass@ep-xyz.neon.tech/dbname?sslmode=require`)
    - `JWT_SECRET`: A secure random secret string.
+   - `CORS_ORIGIN`: Your Vercel domain (comma-separated list allowed).
+   - `NODE_ENV`: `production`
 
 ### 2. Frontend Deployment on Vercel
 1. Go to [Vercel Dashboard](https://vercel.com/) and create a **New Project**.

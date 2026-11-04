@@ -1,4 +1,4 @@
-// Usage: node scripts/local.js [--test] <cmd> [...args]
+// Usage: node scripts/local.js [--test | --env <file>] <cmd> [...args]
 // Loads .env.local (or .env.test), overrides DATABASE_URL, guards, then runs cmd.
 const fs = require('fs');
 const path = require('path');
@@ -9,13 +9,15 @@ const { assertSafeDatabaseUrl } = require('../src/lib/dbGuard');
 const args = process.argv.slice(2);
 const isTest = args[0] === '--test';
 if (isTest) args.shift();
+let envFile; // --env <file>: alternate local env file (still passes the local-host guard)
+if (args[0] === '--env') { args.shift(); envFile = args.shift(); }
 const [cmd, ...cmdArgs] = args;
 if (!cmd) {
   console.error('Usage: node scripts/local.js [--test] <cmd> [...args]');
   process.exit(2);
 }
 
-const file = path.join(__dirname, '..', isTest ? '.env.test' : '.env.local');
+const file = envFile ? path.resolve(envFile) : path.join(__dirname, '..', isTest ? '.env.test' : '.env.local');
 if (!fs.existsSync(file)) {
   console.error(`Missing ${path.basename(file)} (copy from ${path.basename(file)}.example)`);
   process.exit(2);

@@ -5,6 +5,8 @@ const portalRoutes = require('./routes/portal');
 
 function createApp() {
   const app = express();
+  // Render terminates TLS in front of us; trust one hop so req.ip (login limiter) is the client IP.
+  if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
   // Enable CORS for frontend requests
   app.use(
