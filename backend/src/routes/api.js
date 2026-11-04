@@ -10,6 +10,7 @@ const loanController = require('../controllers/loanController');
 const paymentController = require('../controllers/paymentController');
 const dashboardController = require('../controllers/dashboardController');
 const reportController = require('../controllers/reportController');
+const recurringPaymentController = require('../controllers/recurringPaymentController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -55,6 +56,11 @@ router.post('/payments', wrap(paymentController.recordPayment));
 router.get('/payments', wrap(paymentController.getPaymentHistory));
 router.put('/payments/:id', wrap(paymentController.updatePayment));
 router.delete('/payments/:id', wrap(paymentController.deletePayment));
+
+// Recurring payments (FIFO over dues, rebuilt on every write)
+router.post('/recurring-payments', wrap(recurringPaymentController.createPayment));
+router.put('/recurring-payments/:id', wrap(recurringPaymentController.updatePayment));
+router.delete('/recurring-payments/:id', wrap(recurringPaymentController.deletePayment));
 
 // Reports
 router.get('/reports/excel', wrap(reportController.exportExcelReport));
