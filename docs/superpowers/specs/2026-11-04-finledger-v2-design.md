@@ -106,19 +106,20 @@ All owner screens share a left menu: **Overview**, then **Ledgers**: Lending, ea
 11. **Settings.** Change password. ADMIN only: family accounts (create, reset password, disable).
 12. **Payer portal (phone-first).** Their units and current amount, what's due now, month-by-month history, payments, advance held. No totals of anyone else, no owner data.
 
-## 9. Visual style (owner chose "A")
+## 9. Visual style (owner decision, updated 2026-11-04)
 
-Neumorphism base with claymorphism accents, as shown in mockup `clay-neu-blend.html` option A:
+Classic black and white with glassmorphism, in two themes (mockup `bw-glass.html`, A = light, B = dark):
 
-- Owner palette (updated 2026-11-04, mockup `palette-v3.html`): soft lavender white `#e9e8f8`, powder blue `#8db9f0`, warm sunset peach `#f5b69e`.
-- Base surface lavender white `#e9e8f8`; neumorphic raised/inset shadows (`8px 8px 16px #c7c6de, -8px -8px 16px #fff` / inset equivalents) for frame, menu, tables, inputs, chips, secondary buttons.
-- Clay accents (pastel fills + inner highlight + soft drop) for stat cards and status pills: green `#c9f2dc` paid, amber `#ffeab5` partial, rose `#ffd9d6` overdue, peach `#f5b69e` advances (ink `#5c2410`), light blue `#cfe2fb` neutral/occupied (ink `#1e3a66`); dark text on each.
-- Primary accent powder blue `#8db9f0` for main buttons, with navy ink `#1e3a66` (white on this blue fails contrast); active menu/chip text `#1e3a66`. Peach `#f5b69e` is the secondary accent (logo gradient, advances card, second chart series). Muted text `#55607a`, dotted rules `#d4d3ea`.
-- Font: Nunito (800–900 for numbers and headings), tabular numerals for money.
-- Large radii (16–28px).
-- Contrast: body text and numbers must meet WCAG AA against the grey base; status is never conveyed by color alone (always a word).
-- Implement as Tailwind theme tokens + a few component classes (`neu`, `neu-in`, `clay`), not per-component inline shadows.
+- **Theme selection:** follows the device setting (`prefers-color-scheme`) by default; a System / Light / Dark switch in Settings and in the payer portal overrides it per browser (localStorage).
+- **Light:** page `#fafafa` with soft blurred grey shapes (`#d4d4d4`, `#a3a3a3`, `#e5e5e5`) behind content; glass panels `rgba(255,255,255,.55)` + `backdrop-filter: blur(18px)` + 1px `rgba(255,255,255,.8)` border + soft shadow; text `#0a0a0a`, secondary `#525252`; primary actions and active items black `#0a0a0a` with white text; hairlines `rgba(0,0,0,.08)`.
+- **Dark:** page `#0a0a0a` with blurred grey shapes (`#525252`, `#3f3f3f`, `#737373`); glass panels `rgba(255,255,255,.07)` + blur + 1px `rgba(255,255,255,.14)` border; text `#fafafa`, secondary `#a3a3a3`; primary actions and active items white `#fafafa` with black text; hairlines `rgba(255,255,255,.08)`.
+- **Status without color:** Paid = solid tag (ink fill), Partial = outlined, Overdue = dashed outline with "!", Vacant/Upcoming/other = muted thin outline. The word is always shown.
+- Font Inter 400–800, tabular numerals for money; radii 12–26px.
+- Contrast: all text ≥ 4.5:1 against the glass panels in both themes.
+- Implement with CSS variables on `:root` / `[data-theme]` mapped into Tailwind tokens, so screens use semantic classes only.
 - Indian number formatting (₹1,42,000).
+
+(Superseded directions: neumorphism/clay "A" and the powder-blue/lavender/peach palette.)
 
 ## 10. Technical decisions
 
