@@ -50,9 +50,9 @@ test('overview: received by payment date, advances excluded, pending/overdue, ow
   const key = `category:${ids.cat}`;
   assert.equal(o.month, '2026-11');
   assert.deepEqual(o.ledgers, [
-    { key: 'lending', name: 'Lending', received: 2000, pending: 0, overdue: 0 },
-    { key, name: 'Rent', received: 7000, pending: 3000, overdue: 3000 }]);
-  assert.deepEqual(o.totals, { received: 9000, pending: 3000, overdue: 3000 });
+    { key: 'lending', name: 'Lending', received: 2000, advanceRetained: 0, pending: 0, overdue: 0 },
+    { key, name: 'Rent', received: 7000, advanceRetained: 0, pending: 3000, overdue: 3000 }]);
+  assert.deepEqual(o.totals, { received: 9000, advanceRetained: 0, pending: 3000, overdue: 3000 });
   assert.deepEqual(o.owedBack, { advances: 50000, credit: 0 });
   assert.equal(o.trend.length, 12);
   assert.deepEqual([o.trend[0].period, o.trend[11].period], ['2025-12', '2026-11']);
@@ -67,6 +67,22 @@ test('overview: received by payment date, advances excluded, pending/overdue, ow
   assert.equal(oct.totals.received, 0);
   assert.deepEqual(oct.trend.map((t) => t.period), ['2026-08', '2026-09', '2026-10']);
   for (const q of ['month=2026-13', 'month=x', 'months=0', 'months=25']) await A('GET', `/overview?${q}`, undefined, 400);
+});
+
+test('move-out: applied advance counts as received on settlement date; retained is shown apart, never as received', async () => {
+  // Nov due (end 11-04, prorated 4/30 of 3000) = 400; unpaid 3000 + 400 = 3400 applied, 2000 retained, rest refunded
+  await A('POST', `/agreements/${ids.g2}/move-out`, { endDate: '2026-11-04', lastMonthRule: 'PRORATED', applyAdvance: true,
+    retained: { amount: 2000, notes: 'damages' } });
+  const key = `category:${ids.cat}`;
+  const o = await A('GET', '/overview');
+  assert.deepEqual(o.ledgers.map((l) => [l.key, l.received, l.advanceRetained, l.pending]), [['lending', 2000, 0, 0], [key, 10400, 2000, 0]]);
+  assert.deepEqual(o.totals, { received: 12400, advanceRetained: 2000, pending: 0, overdue: 0 });
+  assert.deepEqual(o.owedBack, { advances: 0, credit: 0 }); // was 50000
+  assert.equal(o.trend[11].byLedger[key], 10400);
+  const d = await A('GET', `/categories/${ids.cat}/dashboard`);
+  assert.deepEqual([d.stats.collectedThisMonth, d.stats.advanceRetained, d.stats.advancesHeld], [10400, 2000, 0]);
+  const oct = await A('GET', '/overview?month=2026-10');
+  assert.deepEqual([oct.totals.received, oct.totals.advanceRetained], [0, 0]);
 });
 
 test('archived categories drop out of the overview', async () => {
@@ -88,7 +104,7 @@ test('B sees nothing of A in overview, dashboard, calendar, export', async () =>
 
 test('category dashboard: stats, units, placeId filter', async () => {
   const d = await A('GET', `/categories/${ids.cat}/dashboard`);
-  assert.deepEqual(d.stats, { dueThisMonth: 0, collectedThisMonth: 7000, pending: 3000, overdue: 3000,
+  assert.deepEqual(d.stats, { dueThisMonth: 10000, collectedThisMonth: 7000, advanceRetained: 0, pending: 3000, overdue: 3000,
     advancesHeld: 50000, credit: 0, occupied: 2, totalUnits: 3 });
   assert.deepEqual(d.places.map((p) => p.name), ['Building A', 'Building B']);
   assert.equal(d.category.name, 'Rent');

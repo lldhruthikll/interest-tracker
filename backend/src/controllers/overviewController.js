@@ -1,5 +1,6 @@
 // Read side across ledgers: combined Overview and calendar. Ledger keys: 'lending', 'category:<id>'.
-// Received = allocations dated by payment date (IST month); advances never count (spec §7).
+// Received = allocations dated by payment date (IST month). A deposit never counts; advance applied to rent does (spec §7).
+// Retained advance is reported apart as advanceRetained, never in received.
 const { toPaise } = require('../lib/money');
 const { ValidationError } = require('../lib/errors');
 const { todayIST, addDays, addMonths, toDateOnly, toDbDate, periodOf, isValidDateStr } = require('../lib/dates');
@@ -86,14 +87,20 @@ async function getOverview(req, res) {
       select: { amount: true, payment: { select: { paymentDate: true } } } });
     for (const a of lendingAllocs) add(LENDING.key, istPeriod(a.payment.paymentDate), a.amount);
     const recAllocs = await tx.recurringAllocation.findMany({
-      where: { payment: { method: { not: 'ADVANCE' }, paymentDate: { gte: toDbDate(`${periods[0]}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } } },
+      where: { payment: { paymentDate: { gte: toDbDate(`${periods[0]}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } } },
       select: { amount: true, payment: { select: { paymentDate: true } },
         due: { select: { agreement: { select: { unit: { select: { place: { select: { categoryId: true } } } } } } } } } });
     for (const a of recAllocs) add(catKey(a.due.agreement.unit.place.categoryId), toDateOnly(a.payment.paymentDate).slice(0, 7), a.amount);
 
+    const retained = Object.fromEntries(ledgers.map((l) => [l.key, 0]));
+    const kept = await tx.advanceEntry.findMany({ where: { type: 'RETAINED',
+      date: { gte: toDbDate(`${month}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } },
+      select: { amount: true, agreement: { select: { unit: { select: { place: { select: { categoryId: true } } } } } } } });
+    for (const e of kept) if (retained[catKey(e.agreement.unit.place.categoryId)] !== undefined) retained[catKey(e.agreement.unit.place.categoryId)] += toPaise(e.amount);
+
     const owed = await dueItems(tx, cats, '1970-01-01', today, { activeOnly: true });
     const sumOf = (key, f) => owed.filter((i) => i.ledgerKey === key && unpaid(i) > 0 && f(i)).reduce((s, i) => s + unpaid(i), 0);
-    const rows = ledgers.map((l) => ({ ...l, received: received[l.key][month], pending: sumOf(l.key, (i) => i.date <= today),
+    const rows = ledgers.map((l) => ({ ...l, received: received[l.key][month], advanceRetained: retained[l.key], pending: sumOf(l.key, (i) => i.date <= today),
       overdue: sumOf(l.key, (i) => i.date < today) }));
 
     let advances = 0; let credit = 0;
@@ -108,8 +115,8 @@ async function getOverview(req, res) {
   const sum = (f) => out.rows.reduce((s, l) => s + f(l), 0);
   res.json({
     month,
-    ledgers: out.rows.map((l) => ({ key: l.key, name: l.name, received: rupees(l.received), pending: rupees(l.pending), overdue: rupees(l.overdue) })),
-    totals: { received: rupees(sum((l) => l.received)), pending: rupees(sum((l) => l.pending)), overdue: rupees(sum((l) => l.overdue)) },
+    ledgers: out.rows.map((l) => ({ key: l.key, name: l.name, received: rupees(l.received), advanceRetained: rupees(l.advanceRetained), pending: rupees(l.pending), overdue: rupees(l.overdue) })),
+    totals: { received: rupees(sum((l) => l.received)), advanceRetained: rupees(sum((l) => l.advanceRetained)), pending: rupees(sum((l) => l.pending)), overdue: rupees(sum((l) => l.overdue)) },
     owedBack: { advances: rupees(out.advances), credit: rupees(out.credit) },
     trend: periods.map((period) => ({ period,
       byLedger: Object.fromEntries(out.ledgers.map((l) => [l.key, rupees(out.received[l.key][period])])) })),

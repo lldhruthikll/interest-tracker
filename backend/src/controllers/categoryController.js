@@ -1,10 +1,11 @@
 // Categories → places → units. Every parent is requireOwned before a child is linked to it.
 const { HttpError, NotFound, parseId, fields } = require('../lib/errors');
-const { todayIST, toDateOnly, toDbDate, periodOf, addMonths } = require('../lib/dates');
+const { todayIST, toDateOnly, toDbDate, addMonths, clampDay } = require('../lib/dates');
+const { buildSchedule } = require('../services/schedule');
 const { monthParam } = require('./overviewController');
 const { parseAmountPaise, fromPaise, toPaise } = require('../lib/money');
 const { requireOwned } = require('../lib/ownerDb');
-const { syncAgreement, unitStatus, currentRate, agreementBalances } = require('../services/recurringSync');
+const { syncAgreement, unitStatus, currentRate, agreementBalances, scheduleInput } = require('../services/recurringSync');
 
 const CATEGORY = { name: 'text', placeLabel: 'text', unitLabel: 'text', payerLabel: 'text', color: 'opt', archived: 'bool' };
 const PLACE = { name: 'text', address: 'opt', archived: 'bool' };
@@ -74,18 +75,29 @@ async function getDashboard(req, res) {
     const inAgreement = { agreement: { unit: inPlaces } };
     const dues = await tx.recurringDue.findMany({ where: inAgreement });
     const sumUnpaid = (f) => dues.filter(f).reduce((s, d) => s + toPaise(d.amount) - toPaise(d.paidAmount), 0);
-    const collected = await tx.recurringAllocation.findMany({ where: { due: inAgreement, payment: { method: { not: 'ADVANCE' },
+    const collected = await tx.recurringAllocation.findMany({ where: { due: inAgreement, payment: {
       paymentDate: { gte: toDbDate(`${month}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } } }, select: { amount: true } });
     let advances = 0; let credit = 0;
     for (const a of await tx.agreement.findMany({ where: { unit: inPlaces }, orderBy: { id: 'asc' } })) {
       const b = await agreementBalances(tx, a.id);
       advances += b.advanceHeldPaise; credit += b.creditPaise;
     }
+    // this month's dues not yet persisted (due date still ahead) come from the schedule
+    const have = new Set(dues.map((d) => `${d.agreementId}|${d.period}`));
+    let dueMonth = dues.filter((d) => d.period === month).reduce((s, d) => s + toPaise(d.amount), 0);
+    for (const u of unitRows) for (const a of u.agreements) {
+      for (const sc of buildSchedule(scheduleInput(a), clampDay(month, 31))) {
+        if (sc.period === month && !have.has(`${a.id}|${month}`)) dueMonth += sc.amountPaise;
+      }
+    }
+    const kept = await tx.advanceEntry.findMany({ where: { type: 'RETAINED', agreement: { unit: inPlaces },
+      date: { gte: toDbDate(`${month}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } }, select: { amount: true } });
     const stats = {
-      dueThisMonth: dues.filter((d) => d.period === month).reduce((s, d) => s + toPaise(d.amount), 0) / 100,
+      dueThisMonth: dueMonth / 100,
       collectedThisMonth: collected.reduce((s, a) => s + toPaise(a.amount), 0) / 100,
       pending: sumUnpaid((d) => toDateOnly(d.dueDate) <= today) / 100,
       overdue: sumUnpaid((d) => toDateOnly(d.dueDate) < today) / 100,
+      advanceRetained: kept.reduce((s, e) => s + toPaise(e.amount), 0) / 100,
       advancesHeld: advances / 100, credit: credit / 100,
       occupied: units.filter((u) => u.agreementId).length, totalUnits: units.length };
     return { category, places: places.map((p) => ({ id: p.id, name: p.name })), stats, units };
