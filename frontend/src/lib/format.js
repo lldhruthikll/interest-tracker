@@ -15,3 +15,13 @@ export function periodLabel(p) {
   const [y, m] = p.split('-').map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 }
+
+// Payment.paymentDate is an ISO timestamp; date-only fields are 'YYYY-MM-DD'. Both -> 'YYYY-MM-DD' in IST.
+const ist = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+export const toDateInput = (s) => {
+  if (!s) return '';
+  const t = String(s);
+  return t.length <= 10 ? t : ist.format(new Date(t));
+};
+export const todayIST = () => ist.format(new Date());
+export const formatAnyDate = (s) => formatDate(toDateInput(s));

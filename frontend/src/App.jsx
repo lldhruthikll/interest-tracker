@@ -1,15 +1,16 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import AppShell from './components/AppShell';
 import PortalShell from './components/PortalShell';
 import LoginPage from './pages/auth/LoginPage';
 import ChangePasswordPage from './pages/auth/ChangePasswordPage';
-import DashboardPage from './pages/DashboardPage';
-import BorrowersPage from './pages/BorrowersPage';
-import BorrowerDetailPage from './pages/BorrowerDetailPage';
+import LendingLayout from './pages/lending/LendingLayout';
+import LendingDashboardPage from './pages/lending/LendingDashboardPage';
+import BorrowersPage from './pages/lending/BorrowersPage';
+import BorrowerDetailPage from './pages/lending/BorrowerDetailPage';
+import ReportsPage from './pages/lending/ReportsPage';
 import CalendarPage from './pages/CalendarPage';
-import ReportsPage from './pages/ReportsPage';
 import { EmptyState } from './components/ui';
 
 const Placeholder = ({ title }) => (
@@ -18,6 +19,8 @@ const Placeholder = ({ title }) => (
     <EmptyState title="Coming soon">This screen is built in a later step.</EmptyState>
   </div>
 );
+
+const BorrowerRedirect = () => <Navigate to={`/lending/borrowers/${useParams().id}`} replace />;
 
 // Gate: unauthenticated -> /login; flagged -> /change-password; PAYER vs owner split.
 function Gate({ portal }) {
@@ -42,12 +45,18 @@ export default function App() {
         <Route index element={<Placeholder title="My account" />} />
       </Route>
       <Route element={<Gate />}>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/lending" element={<BorrowersPage />} />
-        <Route path="/borrowers" element={<BorrowersPage />} />
-        <Route path="/borrowers/:id" element={<BorrowerDetailPage />} />
+        {/* ponytail: "/" lands on lending until the Overview screen exists */}
+        <Route path="/" element={<Navigate to="/lending" replace />} />
+        <Route path="/lending" element={<LendingLayout />}>
+          <Route index element={<LendingDashboardPage />} />
+          <Route path="borrowers" element={<BorrowersPage />} />
+          <Route path="borrowers/:id" element={<BorrowerDetailPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+        </Route>
+        <Route path="/borrowers" element={<Navigate to="/lending/borrowers" replace />} />
+        <Route path="/borrowers/:id" element={<BorrowerRedirect />} />
+        <Route path="/reports" element={<Navigate to="/lending/reports" replace />} />
         <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/c/:id" element={<Placeholder title="Category" />} />
         <Route path="/payers" element={<Placeholder title="Payers" />} />
         <Route path="/settings" element={<Placeholder title="Settings" />} />

@@ -148,3 +148,22 @@ export function EmptyState({ title, children }) {
     </div>
   );
 }
+
+export function ErrorNote({ children }) {
+  if (!children) return null;
+  return <p role="alert" className="neu-in rounded-2xl px-4 py-3 text-sm font-bold text-clay-overdue-ink">{children}</p>;
+}
+
+export const Loading = ({ children = 'Loading…' }) => (
+  <div role="status" className="flex h-48 items-center justify-center font-bold text-muted">{children}</div>
+);
+
+export const PageHeader = ({ title, sub, children }) => (
+  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+    <div>
+      <h1 className="text-2xl font-black">{title}</h1>
+      {sub && <p className="text-sm font-semibold text-muted">{sub}</p>}
+    </div>
+    {children && <div className="flex flex-wrap items-center gap-3">{children}</div>}
+  </div>
+);
