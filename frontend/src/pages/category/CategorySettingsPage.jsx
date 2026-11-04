@@ -40,7 +40,7 @@ export default function CategorySettingsPage() {
   return (
     <div className="max-w-xl space-y-6">
       <PageHeader title={`${cat.name} settings`} sub={cat.archived ? 'Archived' : undefined}>
-        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage places</Link>
+        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {cat.placeLabel}</Link>
       </PageHeader>
       <ErrorNote>{error}</ErrorNote>
       {ok && <p role="status" className="clay-paid rounded-2xl px-4 py-3 text-sm font-bold">{ok}</p>}
