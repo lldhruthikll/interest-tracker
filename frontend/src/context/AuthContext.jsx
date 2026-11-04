@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 
 const AuthContext = createContext(null);
@@ -36,14 +36,21 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-  };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const u = await api.getProfile();
+    localStorage.setItem('user', JSON.stringify(u));
+    setUser(u);
+    return u;
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, refresh, loading }}>
       {children}
     </AuthContext.Provider>
   );

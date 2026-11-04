@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
-import StatCard from '../components/StatCard';
+import { StatCard } from '../components/ui';
 import NotificationBanner from '../components/NotificationBanner';
 import PaymentModal from '../components/PaymentModal';
 import BorrowerFormModal from '../components/BorrowerFormModal';
@@ -154,46 +154,40 @@ export default function DashboardPage() {
       {/* 6 Required Dashboard Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          title="Interest Due Today"
+          label="Interest Due Today"
           value={`₹${summary?.todaysDueAmount || 0}`}
-          subtext={`${summary?.todaysDueCount || 0} borrower(s) due today`}
-          icon={Clock}
-          color="cyan"
+          note={`${summary?.todaysDueCount || 0} borrower(s) due today`}
+          tone="neutral"
         />
         <StatCard
-          title="Overdue Borrowers"
+          label="Overdue Borrowers"
           value={summary?.overdueCount || 0}
-          subtext={`Total overdue: ₹${summary?.totalOverdueAmount || 0}`}
-          icon={AlertTriangle}
-          color="rose"
+          note={`Total overdue: ₹${summary?.totalOverdueAmount || 0}`}
+          tone="overdue"
         />
         <StatCard
-          title="Upcoming (Next 7 Days)"
+          label="Upcoming (Next 7 Days)"
           value={summary?.upcomingCount || 0}
-          subtext="Interest due within 7 days"
-          icon={Calendar}
-          color="amber"
+          note="Interest due within 7 days"
+          tone="partial"
         />
         <StatCard
-          title="Total Pending Interest"
+          label="Total Pending Interest"
           value={`₹${summary?.totalPendingInterest || 0}`}
-          subtext="Accumulated uncollected interest"
-          icon={TrendingUp}
-          color="indigo"
+          note="Accumulated uncollected interest"
+          tone="advance"
         />
         <StatCard
-          title="Total Principal Lent"
+          label="Total Principal Lent"
           value={`₹${summary?.totalPrincipalLent || 0}`}
-          subtext="Across active loans"
-          icon={Landmark}
-          color="emerald"
+          note="Across active loans"
+          tone="paid"
         />
         <StatCard
-          title="Total Active Loans"
+          label="Total Active Loans"
           value={summary?.totalActiveLoans || 0}
-          subtext="Currently generating interest"
-          icon={IndianRupee}
-          color="cyan"
+          note="Currently generating interest"
+          tone="neutral"
         />
       </div>
 

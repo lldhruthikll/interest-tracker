@@ -16,7 +16,7 @@ export async function apiFetch(endpoint, options = {}) {
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
-  if (response.status === 401) {
+  if (response.status === 401 && endpoint !== '/auth/login') {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
@@ -25,6 +25,10 @@ export async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403 && errorData.error === 'PASSWORD_CHANGE_REQUIRED') {
+      if (window.location.pathname !== '/change-password') window.location.assign('/change-password');
+      throw new Error('Password change required');
+    }
     throw new Error(errorData.error || `Request failed with status ${response.status}`);
   }
 
@@ -41,6 +45,10 @@ export const api = {
   login: (credentials) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   getProfile: () => apiFetch('/auth/profile'),
+  changePassword: (data) =>
+    apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
+  getCategories: () => apiFetch('/categories'),
+  getPortalMe: () => apiFetch('/portal/me'),
 
   getDashboard: () => apiFetch('/dashboard'),
 
