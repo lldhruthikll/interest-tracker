@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
+import { useDialog } from './ui';
 
 const item = ({ isActive }) =>
   `block rounded-2xl px-3.5 py-2.5 font-bold ${isActive ? 'neu-in text-accent-ink' : 'text-muted hover:text-ink'}`;
@@ -21,6 +22,8 @@ export default function AppShell() {
   const [cats, setCats] = useState([]);
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
+  const drawer = useRef(null);
+  useDialog(open, () => setOpen(false), drawer);
 
   useEffect(() => { api.getCategories().then((c) => setCats(c.filter((x) => !x.archived))).catch(() => {}); }, []);
   useEffect(() => setOpen(false), [pathname]);
@@ -54,8 +57,8 @@ export default function AppShell() {
       {open && (
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="absolute inset-0 bg-ink/30" onClick={() => setOpen(false)} />
-          <div className="neu absolute inset-y-0 left-0 w-64 max-w-[85vw] overflow-y-auto rounded-r-xl3 px-3 py-4">
-            <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="btn !p-2 !rounded-full absolute right-3 top-3"><X size={16} /></button>
+          <div ref={drawer} tabIndex={-1} className="neu outline-none absolute inset-y-0 left-0 w-64 max-w-[85vw] overflow-y-auto rounded-r-xl3 px-3 py-4">
+            <button type="button" data-autofocus aria-label="Close menu" onClick={() => setOpen(false)} className="btn !p-2 !rounded-full absolute right-3 top-3"><X size={16} /></button>
             {menu}
           </div>
         </div>

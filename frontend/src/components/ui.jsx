@@ -46,29 +46,38 @@ export function Chips({ options, value, onChange }) {
   );
 }
 
-export function Modal({ open, title, onClose, children }) {
-  const ref = useRef(null);
-  const titleId = useId();
+// Shared dialog behavior: initial focus, Tab trap, Escape, focus restore. Depends only on `open`.
+export function useDialog(open, onClose, ref) {
+  const cb = useRef(onClose);
+  cb.current = onClose;
   useEffect(() => {
     if (!open) return undefined;
     const prev = document.activeElement;
-    ref.current?.querySelector('input,select,textarea,button:not([data-close])')?.focus();
+    const el = ref.current;
+    (el.querySelector('[data-autofocus],input,select,textarea,button:not([data-close])') || el).focus();
     const onKey = (e) => {
-      if (e.key === 'Escape') return onClose();
+      if (e.key === 'Escape') return cb.current();
       if (e.key !== 'Tab') return;
-      const f = [...ref.current.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled);
-      if (!f.length) return;
+      const f = [...el.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled);
+      if (!f.length) { e.preventDefault(); return; }
       const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      if (!el.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  }, [open, onClose]);
+  }, [open, ref]);
+}
+
+export function Modal({ open, title, onClose, children }) {
+  const ref = useRef(null);
+  const titleId = useId();
+  useDialog(open, onClose, ref);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/30" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} className="neu rounded-xl3 p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="neu outline-none rounded-xl3 p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 id={titleId} className="text-xl font-black">{title}</h2>
           <button data-close type="button" aria-label="Close" onClick={onClose} className="btn !p-2 !rounded-full"><X size={18} /></button>
