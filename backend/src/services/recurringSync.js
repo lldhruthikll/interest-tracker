@@ -8,6 +8,10 @@ const { todayIST, toDateOnly, toDbDate } = require('../lib/dates');
 const sum = (rows, f = (r) => toPaise(r.amount)) => rows.reduce((s, r) => s + f(r), 0);
 
 async function syncAgreement(db, agreementId, { until = todayIST(), materializeAll = false } = {}) {
+  // Serialize writers per agreement; later READ COMMITTED statements then see the previous writer's commit.
+  // NO KEY UPDATE, not UPDATE: callers insert FK children (KEY SHARE on this row) before syncing, and
+  // FOR UPDATE would deadlock two such writers. Raw SQL skips the owner scope: callers requireOwned first.
+  await db.$queryRaw`SELECT id FROM "Agreement" WHERE id = ${agreementId} FOR NO KEY UPDATE`;
   const a = await db.agreement.findUniqueOrThrow({ where: { id: agreementId }, include: { rateChanges: true } });
   const input = {
     ...a,

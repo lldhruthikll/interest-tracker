@@ -85,6 +85,24 @@ test('move-out shrinks a paid final due; excess becomes credit', async () => {
   assert.equal((await db.$transaction((tx) => agreementBalances(tx, agr.id))).creditPaise, 200000);
 });
 
+test('concurrent payments on one agreement stay consistent', async () => {
+  const total = async () => {
+    const d = await db.recurringDue.findMany({ where: { agreementId: agr.id } });
+    const sum = (rows, k) => rows.reduce((t, r) => t + Math.round(Number(r[k]) * 100), 0);
+    return { paid: sum(d, 'paidAmount'), dues: sum(d, 'amount'),
+      alloc: sum(await db.recurringAllocation.findMany(), 'amount'), pays: sum(await db.recurringPayment.findMany(), 'amount') };
+  };
+  // round 1: no dues/allocations yet; round 2: allocations exist
+  for (const amount of [7000, 20000]) {
+    const body = { agreementId: agr.id, amount, paymentDate: '2026-04-01', method: 'CASH' };
+    const rs = await Promise.all([pay('POST', '', body), pay('POST', '', body)]);
+    assert.deepEqual(rs.map((r) => r.status), [201, 201], JSON.stringify(rs.map((r) => r.body)));
+    const t = await total();
+    assert.equal(t.paid, t.alloc);
+    assert.equal(t.alloc, Math.min(t.pays, t.dues), JSON.stringify(t));
+  }
+});
+
 test('validation: amount, dates, method, ended agreement', async () => {
   const ok = { agreementId: agr.id, amount: 100, paymentDate: '2026-04-01', method: 'CASH' };
   const bad = [
