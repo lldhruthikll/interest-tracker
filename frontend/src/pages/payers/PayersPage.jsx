@@ -13,8 +13,11 @@ export default function PayersPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => api.getPayers(search.trim()).then((r) => { setRows(r); setError(''); }).catch((e) => setError(e.message)), 250);
-    return () => clearTimeout(t);
+    let cancelled = false; // a slow earlier response must not overwrite a newer one
+    const t = setTimeout(() => api.getPayers(search.trim())
+      .then((r) => { if (!cancelled) { setRows(r); setError(''); } })
+      .catch((e) => { if (!cancelled) setError(e.message); }), 250);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [search]);
 
   const create = async (e) => {

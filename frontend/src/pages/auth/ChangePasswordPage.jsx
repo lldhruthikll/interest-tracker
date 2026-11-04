@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { Field } from '../../components/ui';
@@ -46,6 +46,7 @@ export default function ChangePasswordPage() {
         {error && <p role="alert" className="mt-4 rounded-2xl bg-clay-overdue px-4 py-2 font-bold text-clay-overdue-ink">{error}</p>}
         <button type="submit" disabled={busy} className="btn-primary mt-6 w-full">{busy ? 'Saving…' : 'Update password'}</button>
         <button type="button" onClick={logout} className="btn mt-3 w-full">Log out</button>
+        {!user.mustChangePassword && <Link to="/" className="mt-3 block text-center font-semibold underline">Cancel</Link>}
       </form>
     </div>
   );
