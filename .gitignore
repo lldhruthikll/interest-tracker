@@ -31,3 +31,6 @@ Thumbs.db
 # Database & temporary files
 *.sqlite
 *.sqlite-journal
+
+# Brainstorm mockups
+.superpowers/
