@@ -3,12 +3,27 @@
 const { buildSchedule } = require('./schedule');
 const { planFifo } = require('./allocation');
 const { toPaise, fromPaise } = require('../lib/money');
-const { todayIST, toDateOnly, toDbDate } = require('../lib/dates');
+const { todayIST, toDateOnly, toDbDate, periodOf } = require('../lib/dates');
 
 const sum = (rows, f = (r) => toPaise(r.amount)) => rows.reduce((s, r) => s + f(r), 0);
 
 // Row lock held to transaction end. Raw SQL skips the owner scope: callers requireOwned first.
 const lockAgreement = (db, id) => db.$queryRaw`SELECT id FROM "Agreement" WHERE id = ${id} FOR NO KEY UPDATE`;
+
+// buildSchedule input from an agreement row loaded with rateChanges.
+const scheduleInput = (a) => ({
+  ...a,
+  startDate: toDateOnly(a.startDate),
+  endDate: a.endDate ? toDateOnly(a.endDate) : null,
+  rates: a.rateChanges.map((r) => ({ effectiveFrom: r.effectiveFrom, amountPaise: toPaise(r.amount) })),
+});
+
+// Rent in force this month (rupees), falling back to the earliest rate; null with no rates.
+function currentRate(rateChanges, today = todayIST()) {
+  const sorted = [...rateChanges].sort((x, y) => (x.effectiveFrom < y.effectiveFrom ? -1 : 1));
+  const r = sorted.filter((x) => x.effectiveFrom <= periodOf(today)).pop() ?? sorted[0];
+  return r ? Number(r.amount) : null;
+}
 
 async function syncAgreement(db, agreementId, { until = todayIST(), materializeAll = false } = {}) {
   // Serialize writers per agreement; later READ COMMITTED statements then see the previous writer's commit.
@@ -16,12 +31,7 @@ async function syncAgreement(db, agreementId, { until = todayIST(), materializeA
   // FOR UPDATE would deadlock two such writers.
   await lockAgreement(db, agreementId);
   const a = await db.agreement.findUniqueOrThrow({ where: { id: agreementId }, include: { rateChanges: true } });
-  const input = {
-    ...a,
-    startDate: toDateOnly(a.startDate),
-    endDate: a.endDate ? toDateOnly(a.endDate) : null,
-    rates: a.rateChanges.map((r) => ({ effectiveFrom: r.effectiveFrom, amountPaise: toPaise(r.amount) })),
-  };
+  const input = scheduleInput(a);
   const schedule = buildSchedule(input, materializeAll ? null : until);
   const existing = new Map((await db.recurringDue.findMany({ where: { agreementId } })).map((d) => [d.period, d]));
 
@@ -30,7 +40,8 @@ async function syncAgreement(db, agreementId, { until = todayIST(), materializeA
     await db.recurringDue.createMany({ data: missing.map((s) => ({
       agreementId, period: s.period, dueDate: toDbDate(s.dueDate), amount: fromPaise(s.amountPaise) })) });
   }
-  for (const s of schedule) {
+  // ENDED: a materialized final due can lie past `until`, so re-adjust against the full schedule
+  for (const s of a.status === 'ENDED' ? buildSchedule(input, null) : schedule) {
     const d = existing.get(s.period);
     // unpaid dues follow the schedule; a paid due may only shrink, on move-out (excess → credit via reallocate)
     const cur = d && toPaise(d.amount);
@@ -94,6 +105,13 @@ async function syncOwner(db) {
   }
 }
 
+// Sync every active agreement in a category (id order = syncOwner's lock order). Callers pass a tx.
+async function syncCategory(db, categoryId) {
+  const active = await db.agreement.findMany({ where: { status: 'ACTIVE', unit: { place: { categoryId } } },
+    select: { id: true }, orderBy: { id: 'asc' } });
+  for (const a of active) await syncAgreement(db, a.id);
+}
+
 // Dashboard status of a unit: first match wins. Callers sync the active agreement first.
 async function unitStatus(db, unitId) {
   const a = await db.agreement.findFirst({ where: { unitId, status: 'ACTIVE' }, select: { id: true } });
@@ -107,4 +125,4 @@ async function unitStatus(db, unitId) {
   return 'UPCOMING';
 }
 
-module.exports = { lockAgreement, syncAgreement, reallocate, agreementBalances, syncOwner, unitStatus };
+module.exports = { scheduleInput, currentRate, lockAgreement, syncAgreement, reallocate, agreementBalances, syncOwner, syncCategory, unitStatus };

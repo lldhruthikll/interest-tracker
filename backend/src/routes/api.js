@@ -14,6 +14,7 @@ const recurringPaymentController = require('../controllers/recurringPaymentContr
 const categoryController = require('../controllers/categoryController');
 const payerController = require('../controllers/payerController');
 const agreementController = require('../controllers/agreementController');
+const overviewController = require('../controllers/overviewController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -37,6 +38,10 @@ router.get('/dashboard', wrap(dashboardController.getDashboardStats));
 
 // Analytics
 router.get('/analytics/monthly', wrap(dashboardController.getMonthlyAnalytics));
+
+// Combined overview + calendar across lending and every category
+router.get('/overview', wrap(overviewController.getOverview));
+router.get('/calendar', wrap(overviewController.getCalendar));
 
 // Borrowers
 router.get('/borrowers', wrap(borrowerController.getBorrowers));
@@ -69,6 +74,8 @@ router.delete('/recurring-payments/:id', wrap(recurringPaymentController.deleteP
 router.get('/categories', wrap(categoryController.listCategories));
 router.post('/categories', wrap(categoryController.createCategory));
 router.get('/categories/:id', wrap(categoryController.getCategory));
+router.get('/categories/:id/dashboard', wrap(categoryController.getDashboard));
+router.get('/categories/:id/export', wrap(reportController.exportCategory));
 router.put('/categories/:id', wrap(categoryController.updateCategory));
 router.delete('/categories/:id', wrap(categoryController.deleteCategory));
 router.post('/categories/:id/places', wrap(categoryController.createPlace));

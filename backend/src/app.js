@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const apiRoutes = require('./routes/api');
+const portalRoutes = require('./routes/portal');
 
 function createApp() {
   const app = express();
@@ -21,6 +22,8 @@ function createApp() {
   });
 
   // API Routes
+  // Portal first: apiRoutes' owner-only middleware would 403 PAYERs
+  app.use('/api/portal', portalRoutes);
   app.use('/api', apiRoutes);
 
   // 404 Handler

@@ -85,6 +85,21 @@ test('move-out shrinks a paid final due; excess becomes credit', async () => {
   assert.equal((await db.$transaction((tx) => agreementBalances(tx, agr.id))).creditPaise, 200000);
 });
 
+test('ENDED: a materialized final due shrinks and dues past the end are deleted; their money becomes credit', async () => {
+  await db.agreement.update({ where: { id: agr.id }, data: { dueDay: 20, endDate: toDbDate('2026-08-31') } });
+  await db.$transaction((tx) => syncAgreement(tx, agr.id, { materializeAll: true })); // Mar..Aug materialized
+  assert.equal((await dues()).length, 6);
+  const p = await pay('POST', '', { agreementId: agr.id, amount: 162000, paymentDate: '2026-06-01', method: 'CASH' });
+  assert.equal(p.status, 201, JSON.stringify(p.body));
+  assert.ok((await dues()).every((d) => d[3] === 'PAID'));
+
+  await db.agreement.update({ where: { id: agr.id }, data: { status: 'ENDED', endDate: toDbDate('2026-06-10') } });
+  await sync('2026-06-05'); // June due (06-20) is after `until`: only the full schedule re-adjusts it
+  assert.deepEqual(await dues(), [['2026-03', 7000, 7000, 'PAID'], ['2026-04', 31000, 31000, 'PAID'],
+    ['2026-05', 31000, 31000, 'PAID'], ['2026-06', 10333.33, 10333.33, 'PAID']]);
+  assert.equal((await db.$transaction((tx) => agreementBalances(tx, agr.id))).creditPaise, 8266667);
+});
+
 test('concurrent payments on one agreement stay consistent', async () => {
   const total = async () => {
     const d = await db.recurringDue.findMany({ where: { agreementId: agr.id } });

@@ -2,6 +2,9 @@ const XLSX = require('xlsx');
 const { syncAllActiveLoans } = require('../services/interestService');
 const { toPaise } = require('../lib/money');
 const { todayIST, toDateOnly } = require('../lib/dates');
+const { parseId } = require('../lib/errors');
+const { requireOwned } = require('../lib/ownerDb');
+const { syncCategory } = require('../services/recurringSync');
 
 async function exportExcelReport(req, res) {
   await syncAllActiveLoans(req.db);
@@ -116,6 +119,36 @@ async function exportExcelReport(req, res) {
   return res.send(buffer);
 }
 
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// One category's dues, payments and advances (all agreements, incl. ended).
+async function exportCategory(req, res) {
+  const id = parseId(req.params.id);
+  const { category, agreements } = await req.db.$transaction(async (tx) => {
+    const category = await requireOwned(tx, 'category', id);
+    await syncCategory(tx, id);
+    const agreements = await tx.agreement.findMany({ where: { unit: { place: { categoryId: id } } }, orderBy: { id: 'asc' },
+      include: { unit: { include: { place: true } }, payer: true, dues: { orderBy: { period: 'asc' } },
+        payments: { orderBy: [{ paymentDate: 'asc' }, { id: 'asc' }] }, advances: { orderBy: { id: 'asc' } } } });
+    return { category, agreements };
+  }, { timeout: 30000 });
+
+  const who = (a) => ({ [category.placeLabel]: a.unit.place.name, [category.unitLabel]: a.unit.name, [category.payerLabel]: a.payer.name });
+  const rows = (f) => agreements.flatMap((a) => f(a).map((r) => ({ ...who(a), ...r })));
+  const sheets = {
+    Dues: rows((a) => a.dues.map((d) => ({ Period: d.period, 'Due Date': toDateOnly(d.dueDate), Amount: Number(d.amount),
+      Paid: Number(d.paidAmount), Status: d.status }))),
+    Payments: rows((a) => a.payments.map((p) => ({ Date: toDateOnly(p.paymentDate), Amount: Number(p.amount), Method: p.method, Notes: p.notes || '' }))),
+    Advances: rows((a) => a.advances.map((e) => ({ Date: toDateOnly(e.date), Type: e.type, Amount: Number(e.amount), Notes: e.notes || '' }))),
+  };
+  const wb = XLSX.utils.book_new();
+  for (const [name, data] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), name);
+  res.setHeader('Content-Type', XLSX_TYPE);
+  res.setHeader('Content-Disposition', `attachment; filename=Category_${id}_${todayIST()}.xlsx`);
+  res.send(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
 module.exports = {
   exportExcelReport,
+  exportCategory,
 };

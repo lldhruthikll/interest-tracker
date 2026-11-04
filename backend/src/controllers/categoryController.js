@@ -1,8 +1,10 @@
 // Categories → places → units. Every parent is requireOwned before a child is linked to it.
 const { HttpError, NotFound, parseId, fields } = require('../lib/errors');
-const { parseAmountPaise, fromPaise } = require('../lib/money');
+const { todayIST, toDateOnly, toDbDate, periodOf, addMonths } = require('../lib/dates');
+const { monthParam } = require('./overviewController');
+const { parseAmountPaise, fromPaise, toPaise } = require('../lib/money');
 const { requireOwned } = require('../lib/ownerDb');
-const { syncAgreement, unitStatus } = require('../services/recurringSync');
+const { syncAgreement, unitStatus, currentRate, agreementBalances } = require('../services/recurringSync');
 
 const CATEGORY = { name: 'text', placeLabel: 'text', unitLabel: 'text', payerLabel: 'text', color: 'opt', archived: 'bool' };
 const PLACE = { name: 'text', address: 'opt', archived: 'bool' };
@@ -41,6 +43,53 @@ async function getCategory(req, res) {
     }
     return cat;
   });
+  res.json(out);
+}
+
+// Per-category dashboard. Stats cover the shown places (all, or ?placeId=); pending/overdue are as of today,
+// "this month" is ?month= (default current IST month). Collected = allocations by payment date, advance applications excluded.
+async function getDashboard(req, res) {
+  const id = parseId(req.params.id);
+  const month = monthParam(req.query.month);
+  const placeId = req.query.placeId === undefined ? null : parseId(req.query.placeId);
+  const today = todayIST();
+  const out = await req.db.$transaction(async (tx) => {
+    const category = await requireOwned(tx, 'category', id);
+    const places = await tx.place.findMany({ where: { categoryId: id, archived: false }, orderBy: { id: 'asc' } });
+    if (placeId && !places.some((p) => p.id === placeId)) throw new NotFound('Place not found');
+    const shown = places.filter((p) => !placeId || p.id === placeId);
+    const inPlaces = { placeId: { in: shown.map((p) => p.id) } };
+    const withAgreements = { include: { place: true, agreements: { where: { status: 'ACTIVE' }, include: { payer: true, rateChanges: true } } } };
+    const unitRows = await tx.unit.findMany({ where: { archived: false, ...inPlaces }, orderBy: { id: 'asc' }, ...withAgreements });
+    for (const a of unitRows.flatMap((u) => u.agreements).sort((x, y) => x.id - y.id)) await syncAgreement(tx, a.id);
+
+    const units = [];
+    for (const u of unitRows) {
+      const [a] = u.agreements;
+      units.push({ unitId: u.id, unitName: u.name, placeName: u.place.name,
+        payer: a ? { id: a.payer.id, name: a.payer.name } : null, agreementId: a?.id ?? null,
+        amount: (a && currentRate(a.rateChanges, today)) ?? Number(u.defaultAmount), status: await unitStatus(tx, u.id) });
+    }
+
+    const inAgreement = { agreement: { unit: inPlaces } };
+    const dues = await tx.recurringDue.findMany({ where: inAgreement });
+    const sumUnpaid = (f) => dues.filter(f).reduce((s, d) => s + toPaise(d.amount) - toPaise(d.paidAmount), 0);
+    const collected = await tx.recurringAllocation.findMany({ where: { due: inAgreement, payment: { method: { not: 'ADVANCE' },
+      paymentDate: { gte: toDbDate(`${month}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } } }, select: { amount: true } });
+    let advances = 0; let credit = 0;
+    for (const a of await tx.agreement.findMany({ where: { unit: inPlaces }, orderBy: { id: 'asc' } })) {
+      const b = await agreementBalances(tx, a.id);
+      advances += b.advanceHeldPaise; credit += b.creditPaise;
+    }
+    const stats = {
+      dueThisMonth: dues.filter((d) => d.period === month).reduce((s, d) => s + toPaise(d.amount), 0) / 100,
+      collectedThisMonth: collected.reduce((s, a) => s + toPaise(a.amount), 0) / 100,
+      pending: sumUnpaid((d) => toDateOnly(d.dueDate) <= today) / 100,
+      overdue: sumUnpaid((d) => toDateOnly(d.dueDate) < today) / 100,
+      advancesHeld: advances / 100, credit: credit / 100,
+      occupied: units.filter((u) => u.agreementId).length, totalUnits: units.length };
+    return { category, places: places.map((p) => ({ id: p.id, name: p.name })), stats, units };
+  }, { timeout: 30000 });
   res.json(out);
 }
 
@@ -92,5 +141,5 @@ async function updateUnit(req, res) {
   res.json(out);
 }
 
-module.exports = { listCategories, createCategory, getCategory, updateCategory, deleteCategory,
+module.exports = { listCategories, createCategory, getCategory, getDashboard, updateCategory, deleteCategory,
   createPlace, updatePlace, createUnit, updateUnit };
