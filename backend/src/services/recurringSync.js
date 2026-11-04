@@ -7,11 +7,14 @@ const { todayIST, toDateOnly, toDbDate } = require('../lib/dates');
 
 const sum = (rows, f = (r) => toPaise(r.amount)) => rows.reduce((s, r) => s + f(r), 0);
 
+// Row lock held to transaction end. Raw SQL skips the owner scope: callers requireOwned first.
+const lockAgreement = (db, id) => db.$queryRaw`SELECT id FROM "Agreement" WHERE id = ${id} FOR NO KEY UPDATE`;
+
 async function syncAgreement(db, agreementId, { until = todayIST(), materializeAll = false } = {}) {
   // Serialize writers per agreement; later READ COMMITTED statements then see the previous writer's commit.
   // NO KEY UPDATE, not UPDATE: callers insert FK children (KEY SHARE on this row) before syncing, and
-  // FOR UPDATE would deadlock two such writers. Raw SQL skips the owner scope: callers requireOwned first.
-  await db.$queryRaw`SELECT id FROM "Agreement" WHERE id = ${agreementId} FOR NO KEY UPDATE`;
+  // FOR UPDATE would deadlock two such writers.
+  await lockAgreement(db, agreementId);
   const a = await db.agreement.findUniqueOrThrow({ where: { id: agreementId }, include: { rateChanges: true } });
   const input = {
     ...a,
@@ -45,7 +48,7 @@ async function syncAgreement(db, agreementId, { until = todayIST(), materializeA
 
 async function reallocate(db, agreementId) {
   await db.recurringAllocation.deleteMany({ where: { due: { agreementId } } });
-  const dues = (await db.recurringDue.findMany({ where: { agreementId }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] }))
+  const dues = (await db.recurringDue.findMany({ where: { agreementId }, orderBy: { period: 'asc' } }))
     .map((d) => ({ id: d.id, amountPaise: toPaise(d.amount), paidPaise: 0, old: d }));
   const payments = await db.recurringPayment.findMany({ where: { agreementId }, orderBy: [{ paymentDate: 'asc' }, { id: 'asc' }] });
   const byId = new Map(dues.map((d) => [d.id, d]));
@@ -86,9 +89,22 @@ async function agreementBalances(db, agreementId) {
 
 async function syncOwner(db) {
   // ponytail: sync-on-read; move to a daily job if slow
-  for (const a of await db.agreement.findMany({ where: { status: 'ACTIVE' }, select: { id: true } })) {
+  for (const a of await db.agreement.findMany({ where: { status: 'ACTIVE' }, select: { id: true }, orderBy: { id: 'asc' } })) {
     await syncAgreement(db, a.id);
   }
 }
 
-module.exports = { syncAgreement, reallocate, agreementBalances, syncOwner };
+// Dashboard status of a unit: first match wins. Callers sync the active agreement first.
+async function unitStatus(db, unitId) {
+  const a = await db.agreement.findFirst({ where: { unitId, status: 'ACTIVE' }, select: { id: true } });
+  if (!a) return 'VACANT';
+  if ((await agreementBalances(db, a.id)).overduePaise > 0) return 'OVERDUE';
+  const dues = await db.recurringDue.findMany({ where: { agreementId: a.id }, orderBy: { period: 'asc' } });
+  const today = todayIST();
+  if (dues.some((d) => d.status !== 'PAID' && toDateOnly(d.dueDate) === today)) return 'DUE_TODAY';
+  if (dues.at(-1)?.status === 'PARTIALLY_PAID') return 'PARTIAL';
+  if (dues.length && dues.every((d) => d.status === 'PAID')) return 'PAID';
+  return 'UPCOMING';
+}
+
+module.exports = { lockAgreement, syncAgreement, reallocate, agreementBalances, syncOwner, unitStatus };

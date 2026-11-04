@@ -36,4 +36,4 @@ async function updateMember(req, res) {
   res.json(await prisma.user.findUnique({ where: { id }, select: safe }));
 }
 
-module.exports = { listMembers, createMember, updateMember };
+module.exports = { listMembers, createMember, updateMember, minPw };

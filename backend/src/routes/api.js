@@ -11,6 +11,9 @@ const paymentController = require('../controllers/paymentController');
 const dashboardController = require('../controllers/dashboardController');
 const reportController = require('../controllers/reportController');
 const recurringPaymentController = require('../controllers/recurringPaymentController');
+const categoryController = require('../controllers/categoryController');
+const payerController = require('../controllers/payerController');
+const agreementController = require('../controllers/agreementController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -61,6 +64,35 @@ router.delete('/payments/:id', wrap(paymentController.deletePayment));
 router.post('/recurring-payments', wrap(recurringPaymentController.createPayment));
 router.put('/recurring-payments/:id', wrap(recurringPaymentController.updatePayment));
 router.delete('/recurring-payments/:id', wrap(recurringPaymentController.deletePayment));
+
+// Categories → places → units
+router.get('/categories', wrap(categoryController.listCategories));
+router.post('/categories', wrap(categoryController.createCategory));
+router.get('/categories/:id', wrap(categoryController.getCategory));
+router.put('/categories/:id', wrap(categoryController.updateCategory));
+router.delete('/categories/:id', wrap(categoryController.deleteCategory));
+router.post('/categories/:id/places', wrap(categoryController.createPlace));
+router.put('/places/:id', wrap(categoryController.updatePlace));
+router.post('/places/:id/units', wrap(categoryController.createUnit));
+router.put('/units/:id', wrap(categoryController.updateUnit));
+
+// Payers and their logins
+router.get('/payers', wrap(payerController.listPayers));
+router.post('/payers', wrap(payerController.createPayer));
+router.get('/payers/:id', wrap(payerController.getPayer));
+router.put('/payers/:id', wrap(payerController.updatePayer));
+router.post('/payers/:id/login', wrap(payerController.createLogin));
+router.put('/payers/:id/login', wrap(payerController.updateLogin));
+
+// Agreements: move-in, billing, rates, advance, move-out settlement
+router.post('/agreements/preview', wrap(agreementController.previewAgreement));
+router.post('/agreements', wrap(agreementController.createAgreement));
+router.get('/agreements/:id', wrap(agreementController.getAgreement));
+router.put('/agreements/:id/billing', wrap(agreementController.updateBilling));
+router.post('/agreements/:id/rates', wrap(agreementController.addRate));
+router.post('/agreements/:id/advance', wrap(agreementController.addAdvance));
+router.post('/agreements/:id/move-out/preview', wrap(agreementController.moveOutPreview));
+router.post('/agreements/:id/move-out', wrap(agreementController.moveOut));
 
 // Reports
 router.get('/reports/excel', wrap(reportController.exportExcelReport));

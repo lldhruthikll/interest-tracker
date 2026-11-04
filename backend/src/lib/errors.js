@@ -18,4 +18,25 @@ function parseId(v) {
   return Number(s);
 }
 
-module.exports = { HttpError, ValidationError, NotFound, parseId };
+// Whitelisted body fields → Prisma data. spec: { key: 'text' | 'opt' | 'bool' }. 'text' is required unless partial;
+// 'opt' text accepts null/'' (clears); absent keys are skipped. Unlisted keys (e.g. ownerId) never pass through.
+function fields(body, spec, partial = false) {
+  const data = {};
+  for (const [k, type] of Object.entries(spec)) {
+    const v = body?.[k];
+    if (v === undefined && (partial || type !== 'text')) continue;
+    if (type === 'bool') {
+      if (typeof v !== 'boolean') throw new ValidationError(`${k} must be true or false`);
+      data[k] = v;
+    } else if (type === 'opt') {
+      if (v !== null && typeof v !== 'string') throw new ValidationError(`${k} must be text`);
+      data[k] = v?.trim() || null;
+    } else {
+      if (typeof v !== 'string' || !v.trim()) throw new ValidationError(`${k} is required`);
+      data[k] = v.trim();
+    }
+  }
+  return data;
+}
+
+module.exports = { HttpError, ValidationError, NotFound, parseId, fields };
