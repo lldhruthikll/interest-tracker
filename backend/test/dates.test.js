@@ -26,4 +26,5 @@ test('day helpers and DB conversion', () => {
   assert.equal(d.isValidDateStr('2028-02-29'), true);
   assert.equal(d.isValidDateStr('2026-8-1'), false);
   assert.equal(d.isValidDateStr(undefined), false);
+  assert.equal(d.isValidDateStr('2026-13-01'), false); // Invalid Date must not throw
 });

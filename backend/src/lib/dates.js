@@ -33,6 +33,6 @@ function daysInMonth(period) {
 const clampDay = (period, day) => `${period}-${pad(Math.min(day, daysInMonth(period)))}`;
 
 const isValidDateStr = (s) =>
-  typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && toDateOnly(toDbDate(s)) === s;
+  typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(toDbDate(s)) && toDateOnly(toDbDate(s)) === s;
 
 module.exports = { todayIST, addDays, toDateOnly, toDbDate, periodOf, addMonths, daysInMonth, clampDay, isValidDateStr };
