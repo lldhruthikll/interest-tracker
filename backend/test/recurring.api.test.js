@@ -258,3 +258,22 @@ test('move-out after full June paid in advance: prorated excess refunded as CRED
   assert.deepEqual(g.payments.map((p) => p.method), ['CASH']); // nothing unpaid → no ADVANCE payment
   assert.deepEqual(g.advances.map((e) => [e.type, e.amount]), [['RECEIVED', 5000], ['REFUNDED', 5000], ['CREDIT_REFUNDED', 2000]]);
 });
+
+test('settled ledger is closed to payment edits; ENDED agreement takes payments only up to the unpaid amount', async () => {
+  const ag = await moveIn(ids.u3, { advanceAmount: 5000 });
+  const cash = await pay(ag.id, 3000, '2026-04-05'); // April paid; May ₹3,000 and June unpaid
+  await ok('POST', `/agreements/${ag.id}/move-out`, { endDate: '2026-06-10', lastMonthRule: 'PRORATED', applyAdvance: false, retained: null });
+  const id = cash.payment.id;
+  assert.equal(await status('DELETE', `/recurring-payments/${id}`), 409);
+  assert.equal(await status('PUT', `/recurring-payments/${id}`, { amount: 9000 }), 409);
+
+  // unpaid after move-out: May 3,000 + June 1,000 (prorated)
+  const post = (amount) => status('POST', '/recurring-payments', { agreementId: ag.id, amount, paymentDate: '2026-06-10', method: 'CASH' });
+  assert.equal(await post(4001), 400);
+  assert.equal(await post(1000), 201);
+  assert.equal(await post(3000), 201);
+  assert.equal(await post(1), 400); // fully paid now
+  const g = await ok('GET', `/agreements/${ag.id}`);
+  assert.deepEqual([g.balances.unpaidPaise, g.balances.creditPaise, g.balances.advanceHeldPaise], [0, 0, 0]);
+  assert.equal(g.payments.length, 3);
+});
