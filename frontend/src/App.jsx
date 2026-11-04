@@ -11,6 +11,10 @@ import BorrowersPage from './pages/lending/BorrowersPage';
 import BorrowerDetailPage from './pages/lending/BorrowerDetailPage';
 import ReportsPage from './pages/lending/ReportsPage';
 import CalendarPage from './pages/CalendarPage';
+import OverviewPage from './pages/overview/OverviewPage';
+import CategorySettingsPage from './pages/category/CategorySettingsPage';
+import ManagePlacesPage from './pages/category/ManagePlacesPage';
+import CategoryPlaceholderPage from './pages/category/CategoryPlaceholderPage';
 import { EmptyState } from './components/ui';
 
 const Placeholder = ({ title }) => (
@@ -45,8 +49,7 @@ export default function App() {
         <Route index element={<Placeholder title="My account" />} />
       </Route>
       <Route element={<Gate />}>
-        {/* ponytail: "/" lands on lending until the Overview screen exists */}
-        <Route path="/" element={<Navigate to="/lending" replace />} />
+        <Route path="/" element={<OverviewPage />} />
         <Route path="/lending" element={<LendingLayout />}>
           <Route index element={<LendingDashboardPage />} />
           <Route path="borrowers" element={<BorrowersPage />} />
@@ -57,7 +60,9 @@ export default function App() {
         <Route path="/borrowers/:id" element={<BorrowerRedirect />} />
         <Route path="/reports" element={<Navigate to="/lending/reports" replace />} />
         <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/c/:id" element={<Placeholder title="Category" />} />
+        <Route path="/c/:categoryId" element={<CategoryPlaceholderPage />} />
+        <Route path="/c/:categoryId/manage" element={<ManagePlacesPage />} />
+        <Route path="/c/:categoryId/settings" element={<CategorySettingsPage />} />
         <Route path="/payers" element={<Placeholder title="Payers" />} />
         <Route path="/settings" element={<Placeholder title="Settings" />} />
         <Route path="*" element={<Navigate to="/" replace />} />

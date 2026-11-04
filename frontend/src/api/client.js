@@ -48,6 +48,17 @@ export const api = {
   changePassword: (data) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
   getCategories: () => apiFetch('/categories'),
+  getCategory: (id) => apiFetch(`/categories/${id}`),
+  createCategory: (d) => apiFetch('/categories', { method: 'POST', body: JSON.stringify(d) }),
+  updateCategory: (id, d) => apiFetch(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteCategory: (id) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
+  createPlace: (catId, d) => apiFetch(`/categories/${catId}/places`, { method: 'POST', body: JSON.stringify(d) }),
+  updatePlace: (id, d) => apiFetch(`/places/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  createUnit: (placeId, d) => apiFetch(`/places/${placeId}/units`, { method: 'POST', body: JSON.stringify(d) }),
+  updateUnit: (id, d) => apiFetch(`/units/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  getOverview: (month, months = 12) => apiFetch(`/overview?months=${months}${month ? `&month=${month}` : ''}`),
+  getCalendar: (from, to, ledger = '') =>
+    apiFetch(`/calendar?from=${from}&to=${to}${ledger ? `&ledger=${encodeURIComponent(ledger)}` : ''}`),
   getPortalMe: () => apiFetch('/portal/me'),
 
   getDashboard: () => apiFetch('/dashboard'),

@@ -1,9 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { useDialog } from './ui';
+import NewCategoryModal from '../pages/category/NewCategoryModal';
+
+// Pages call this after creating/archiving/renaming a category so the sidebar reloads.
+export const refreshCategories = () => window.dispatchEvent(new Event('categories:changed'));
 
 const item = ({ isActive }) =>
   `block rounded-2xl px-3.5 py-2.5 font-bold ${isActive ? 'neu-in text-accent-ink' : 'text-muted hover:text-ink'}`;
@@ -21,11 +25,18 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const [cats, setCats] = useState([]);
   const [open, setOpen] = useState(false);
+  const [newCat, setNewCat] = useState(false);
+  const navigate = useNavigate();
   const { pathname } = useLocation();
   const drawer = useRef(null);
   useDialog(open, () => setOpen(false), drawer);
 
-  useEffect(() => { api.getCategories().then((c) => setCats(c.filter((x) => !x.archived))).catch(() => {}); }, []);
+  useEffect(() => {
+    const load = () => api.getCategories().then((c) => setCats(c.filter((x) => !x.archived))).catch(() => {});
+    load();
+    window.addEventListener('categories:changed', load);
+    return () => window.removeEventListener('categories:changed', load);
+  }, []);
   useEffect(() => setOpen(false), [pathname]);
 
   const menu = (
@@ -35,7 +46,7 @@ export default function AppShell() {
       <div className="px-3 pt-2.5 text-[10px] font-extrabold uppercase tracking-[.08em] text-muted">Ledgers</div>
       <NavLink to="/lending" className={item}>Lending</NavLink>
       {cats.map((c) => <NavLink key={c.id} to={`/c/${c.id}`} className={item}>{c.name}</NavLink>)}
-      <NavLink to="/c/new" className="mt-1.5 rounded-2xl border-2 border-dashed border-[#c3c1df] px-3.5 py-2.5 text-center font-bold text-muted hover:text-ink">+ New category</NavLink>
+      <button type="button" onClick={() => { setOpen(false); setNewCat(true); }} className="mt-1.5 rounded-2xl border-2 border-dashed border-[#c3c1df] px-3.5 py-2.5 text-center font-bold text-muted hover:text-ink">+ New category</button>
       <div className="mt-3 flex flex-col gap-2 border-t-2 border-dotted border-line pt-3">
         <NavLink to="/payers" className={item}>Payers</NavLink>
         <NavLink to="/calendar" className={item}>Calendar</NavLink>
@@ -64,6 +75,8 @@ export default function AppShell() {
         </div>
       )}
       <main className="min-w-0 flex-1"><Outlet /></main>
+      <NewCategoryModal open={newCat} onClose={() => setNewCat(false)}
+        onCreated={(c) => { setNewCat(false); refreshCategories(); navigate(`/c/${c.id}/manage`); }} />
     </div>
   );
 }
