@@ -110,9 +110,10 @@ All owner screens share a left menu: **Overview**, then **Ledgers**: Lending, ea
 
 Neumorphism base with claymorphism accents, as shown in mockup `clay-neu-blend.html` option A:
 
-- Base surface cool grey `#e8ebf1`; neumorphic raised/inset shadows (`8px 8px 16px #c8ccd4, -8px -8px 16px #fff` / inset equivalents) for frame, menu, tables, inputs, chips, secondary buttons.
-- Clay accents (pastel fills + inner highlight + soft drop) for stat cards and status pills: green `#c9f2dc` paid, amber `#ffeab5` partial, rose `#ffd9d6` overdue, lavender `#dcd6ff` advances; dark text on each.
-- Primary accent violet `#7c6cf2` for main buttons and the active state.
+- Owner palette (updated 2026-11-04, mockup `palette-v3.html`): soft lavender white `#e9e8f8`, powder blue `#8db9f0`, warm sunset peach `#f5b69e`.
+- Base surface lavender white `#e9e8f8`; neumorphic raised/inset shadows (`8px 8px 16px #c7c6de, -8px -8px 16px #fff` / inset equivalents) for frame, menu, tables, inputs, chips, secondary buttons.
+- Clay accents (pastel fills + inner highlight + soft drop) for stat cards and status pills: green `#c9f2dc` paid, amber `#ffeab5` partial, rose `#ffd9d6` overdue, peach `#f5b69e` advances (ink `#5c2410`), light blue `#cfe2fb` neutral/occupied (ink `#1e3a66`); dark text on each.
+- Primary accent powder blue `#8db9f0` for main buttons, with navy ink `#1e3a66` (white on this blue fails contrast); active menu/chip text `#1e3a66`. Peach `#f5b69e` is the secondary accent (logo gradient, advances card, second chart series). Muted text `#55607a`, dotted rules `#d4d3ea`.
 - Font: Nunito (800–900 for numbers and headings), tabular numerals for money.
 - Large radii (16–28px).
 - Contrast: body text and numbers must meet WCAG AA against the grey base; status is never conveyed by color alone (always a word).

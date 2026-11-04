@@ -19,7 +19,7 @@
 - Calendar dates (`dueDate`, `startDate`, `endDate`, recurring `paymentDate`, advance `date`) are `@db.Date` and handled in code as `'YYYY-MM-DD'` strings. Business timezone `Asia/Kolkata`; "today" = `todayIST()`.
 - Periods are calendar months as `'YYYY-MM'` strings.
 - Status words are always shown as text, never color alone. Indian grouping: `₹1,42,000`.
-- Visual tokens from spec §9 verbatim: base `#e8ebf1`; raised `8px 8px 16px #c8ccd4, -8px -8px 16px #ffffff`; inset `inset 5px 5px 10px #c8ccd4, inset -5px -5px 10px #ffffff`; clay paid `#c9f2dc`/`#14532d`, partial `#ffeab5`/`#7a4a04`, overdue `#ffd9d6`/`#8f1d1d`, advance `#dcd6ff`/`#3b2f80`; accent `#7c6cf2`; font Nunito 600–900; radii 16–28px.
+- Visual tokens from spec §9 verbatim: base `#e9e8f8`; raised `8px 8px 16px #c7c6de, -8px -8px 16px #ffffff`; inset `inset 5px 5px 10px #c7c6de, inset -5px -5px 10px #ffffff`; clay paid `#c9f2dc`/`#14532d`, partial `#ffeab5`/`#7a4a04`, overdue `#ffd9d6`/`#8f1d1d`, advance `#f5b69e`/`#5c2410`, neutral `#cfe2fb`/`#1e3a66`; accent `#8db9f0` with ink `#1e3a66`; secondary accent peach `#f5b69e`; muted `#55607a`; rules `#d4d3ea`; font Nunito 600–900; radii 16–28px.
 - Tests: `node:test` + `node:assert/strict`, run with `--test-concurrency=1` against the local test DB `finledger_test`.
 
 ## Review Focus
@@ -321,7 +321,7 @@ assert.throws(() => buildSchedule(base, null));
 - Delete: `components/Navbar.jsx`, `components/Sidebar.jsx`, `components/StatCard.jsx` (replaced)
 
 **Interfaces:**
-- Tailwind `theme.extend`: `colors.base '#e8ebf1'`, `colors.ink '#1f2937'`, `colors.muted '#5b6472'` (AA on base), `colors.accent '#7c6cf2'`, `colors.clay.{paid,partial,overdue,advance}` + matching `-ink`; `boxShadow.neu`, `boxShadow['neu-in']`; `fontFamily.sans ['Nunito', …]`; `borderRadius.{xl2:'20px', xl3:'28px'}`.
+- Tailwind `theme.extend`: `colors.base '#e9e8f8'`, `colors.ink '#1e2a44'`, `colors.muted '#55607a'` (AA on base), `colors.accent '#8db9f0'`, `colors['accent-ink'] '#1e3a66'`, `colors.peach '#f5b69e'`, `colors.clay.{paid,partial,overdue,advance,neutral}` + matching `-ink`; `boxShadow.neu`, `boxShadow['neu-in']`; `fontFamily.sans ['Nunito', …]`; `borderRadius.{xl2:'20px', xl3:'28px'}`.
 - `index.css` `@layer components`: `.neu`, `.neu-in`, `.clay` (pastel bg via modifier class + `inset -6px -6px 12px rgba(0,0,0,.07), inset 6px 6px 12px rgba(255,255,255,.75)` + raised drop), `.btn-primary`, `.btn`, `.field`, `.pill`.
 - `ui.jsx` exports: `Button({variant:'primary'|'neu', …})`, `Card`, `InsetCard`, `StatCard({label, value, note, tone:'paid'|'partial'|'overdue'|'advance'|'neutral'})`, `StatusPill({status})` (maps every status from Task 8 `unitStatus` + `PENDING/PARTIALLY_PAID/PAID` to text + tone), `Chips({options, value, onChange})`, `Modal({open, title, onClose, children})` (Escape closes, focus trapped to first field), `Field({label, error, ...inputProps})`, `Select`, `Table({columns, rows})` (horizontal scroll on phones), `EmptyState`.
 - `format.js`: `formatINR(n) → '₹1,42,000'` (`Intl.NumberFormat('en-IN', {style:'currency', currency:'INR', maximumFractionDigits: 2, minimumFractionDigits: 0})`), `formatDate('YYYY-MM-DD') → '25 Mar 2026'` (parse as parts, no timezone shift), `periodLabel('2026-03') → 'Mar 2026'`.
