@@ -14,7 +14,8 @@ import CalendarPage from './pages/CalendarPage';
 import OverviewPage from './pages/overview/OverviewPage';
 import CategorySettingsPage from './pages/category/CategorySettingsPage';
 import ManagePlacesPage from './pages/category/ManagePlacesPage';
-import CategoryPlaceholderPage from './pages/category/CategoryPlaceholderPage';
+import CategoryDashboardPage from './pages/category/CategoryDashboardPage';
+import AgreementDetailPage from './pages/category/AgreementDetailPage';
 import { EmptyState } from './components/ui';
 
 const Placeholder = ({ title }) => (
@@ -60,9 +61,10 @@ export default function App() {
         <Route path="/borrowers/:id" element={<BorrowerRedirect />} />
         <Route path="/reports" element={<Navigate to="/lending/reports" replace />} />
         <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/c/:categoryId" element={<CategoryPlaceholderPage />} />
+        <Route path="/c/:categoryId" element={<CategoryDashboardPage />} />
         <Route path="/c/:categoryId/manage" element={<ManagePlacesPage />} />
         <Route path="/c/:categoryId/settings" element={<CategorySettingsPage />} />
+        <Route path="/agreements/:id" element={<AgreementDetailPage />} />
         <Route path="/payers" element={<Placeholder title="Payers" />} />
         <Route path="/settings" element={<Placeholder title="Settings" />} />
         <Route path="*" element={<Navigate to="/" replace />} />

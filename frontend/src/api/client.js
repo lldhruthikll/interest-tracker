@@ -59,6 +59,35 @@ export const api = {
   getOverview: (month, months = 12) => apiFetch(`/overview?months=${months}${month ? `&month=${month}` : ''}`),
   getCalendar: (from, to, ledger = '') =>
     apiFetch(`/calendar?from=${from}&to=${to}${ledger ? `&ledger=${encodeURIComponent(ledger)}` : ''}`),
+  getCategoryDashboard: (id, placeId, month) => {
+    const q = new URLSearchParams();
+    if (placeId) q.set('placeId', placeId);
+    if (month) q.set('month', month);
+    return apiFetch(`/categories/${id}/dashboard${q.size ? `?${q}` : ''}`);
+  },
+  exportCategory: async (id, name) => {
+    const blob = await apiFetch(`/categories/${id}/export`);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+  getPayers: (search = '') => apiFetch(`/payers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  previewAgreement: (d) => apiFetch('/agreements/preview', { method: 'POST', body: JSON.stringify(d) }),
+  createAgreement: (d) => apiFetch('/agreements', { method: 'POST', body: JSON.stringify(d) }),
+  getAgreement: (id) => apiFetch(`/agreements/${id}`),
+  updateBilling: (id, d) => apiFetch(`/agreements/${id}/billing`, { method: 'PUT', body: JSON.stringify(d) }),
+  addRate: (id, d) => apiFetch(`/agreements/${id}/rates`, { method: 'POST', body: JSON.stringify(d) }),
+  addAdvance: (id, d) => apiFetch(`/agreements/${id}/advance`, { method: 'POST', body: JSON.stringify(d) }),
+  previewMoveOut: (id, d) => apiFetch(`/agreements/${id}/move-out/preview`, { method: 'POST', body: JSON.stringify(d) }),
+  moveOut: (id, d) => apiFetch(`/agreements/${id}/move-out`, { method: 'POST', body: JSON.stringify(d) }),
+  createRecurringPayment: (d) => apiFetch('/recurring-payments', { method: 'POST', body: JSON.stringify(d) }),
+  updateRecurringPayment: (id, d) => apiFetch(`/recurring-payments/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteRecurringPayment: (id) => apiFetch(`/recurring-payments/${id}`, { method: 'DELETE' }),
   getPortalMe: () => apiFetch('/portal/me'),
 
   getDashboard: () => apiFetch('/dashboard'),
