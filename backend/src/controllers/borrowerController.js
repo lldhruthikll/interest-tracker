@@ -217,7 +217,7 @@ async function createBorrower(req, res) {
 
     const newBorrower = await prisma.borrower.create({
       data: {
-        ownerId: req.user.userId,
+        ownerId: req.user.id,
         name,
         phone,
         address: address || null,

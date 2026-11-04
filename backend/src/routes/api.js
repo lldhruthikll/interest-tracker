@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const { authenticateToken } = require('../middleware/auth');
+const { authenticate, requireRole, requirePasswordChanged } = require('../middleware/auth');
+const adminController = require('../controllers/adminController');
 const authController = require('../controllers/authController');
 const borrowerController = require('../controllers/borrowerController');
 const loanController = require('../controllers/loanController');
@@ -10,13 +12,19 @@ const dashboardController = require('../controllers/dashboardController');
 const reportController = require('../controllers/reportController');
 
 // Public auth routes
-router.post('/auth/login', authController.login);
+router.post('/auth/login', wrap(authController.login));
 
-// Protected routes (Require JWT Authentication)
-router.use(authenticateToken);
+// Authenticated, password change allowed while flagged
+router.get('/auth/profile', authenticate, wrap(authController.getProfile));
+router.post('/auth/change-password', authenticate, wrap(authController.changePassword));
 
-// User Profile
-router.get('/auth/profile', authController.getProfile);
+// Family accounts administration (ADMIN only)
+router.get('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminController.listMembers));
+router.post('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminController.createMember));
+router.put('/admin/members/:id', authenticate, requireRole('ADMIN'), wrap(adminController.updateMember));
+
+// Owner routes (Task 5 adds requireRole + owner scoping)
+router.use(authenticate, requirePasswordChanged);
 
 // Dashboard
 router.get('/dashboard', dashboardController.getDashboardStats);

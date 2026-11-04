@@ -22,7 +22,7 @@ async function createLoan(req, res) {
 
     const newLoan = await prisma.loan.create({
       data: {
-        ownerId: req.user.userId,
+        ownerId: req.user.id,
         borrowerId: Number(borrowerId),
         principal: fromPaise(parseAmountPaise(principal)),
         monthlyInterest: fromPaise(parseAmountPaise(monthlyInterest)),

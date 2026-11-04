@@ -12,7 +12,7 @@ async function recordPayment(req, res) {
     }
 
     const result = await allocatePaymentFIFO({
-      ownerId: req.user.userId,
+      ownerId: req.user.id,
       borrowerId: Number(borrowerId),
       loanId: loanId ? Number(loanId) : null,
       amountPaise: parseAmountPaise(amount),

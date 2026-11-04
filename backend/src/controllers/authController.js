@@ -1,74 +1,52 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, loginLimiter } = require('../middleware/auth');
+const { ValidationError, HttpError } = require('../lib/errors');
 
 async function login(req, res) {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
-
-    let user = await prisma.user.findUnique({ where: { username } });
-
-    // Auto-create default admin user if none exists
-    if (!user) {
-      const userCount = await prisma.user.count();
-      if (userCount === 0 && username === 'admin' && password === 'admin123') {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
-        user = await prisma.user.create({
-          data: {
-            username: 'admin',
-            password: hashedPassword,
-            name: 'Admin User',
-          },
-        });
-      } else {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-    } else {
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, username: user.username, name: user.name },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-      },
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+  const { username, password } = req.body || {};
+  if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
+    throw new ValidationError('Username and password are required');
   }
+  if (loginLimiter.blocked(req)) throw new HttpError(429, 'Too many failed attempts, try again later');
+
+  const user = await prisma.user.findUnique({ where: { username } });
+  if (!user || !user.active || !(await bcrypt.compare(password, user.password))) {
+    loginLimiter.fail(req);
+    throw new HttpError(401, 'Invalid credentials');
+  }
+  loginLimiter.reset(req);
+
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({
+    token,
+    user: { id: user.id, username: user.username, name: user.name, role: user.role, mustChangePassword: user.mustChangePassword },
+  });
 }
 
 async function getProfile(req, res) {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { id: true, username: true, name: true, createdAt: true },
-    });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    return res.json(user);
-  } catch (error) {
-    return res.status(500).json({ error: 'Failed to fetch user profile' });
-  }
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { id: true, username: true, name: true, role: true, mustChangePassword: true, createdAt: true },
+  });
+  res.json(user);
 }
 
-module.exports = {
-  login,
-  getProfile,
-};
+async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body || {};
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new ValidationError('New password must be at least 8 characters');
+  }
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  if (typeof currentPassword !== 'string' || !(await bcrypt.compare(currentPassword, user.password))) {
+    throw new HttpError(401, 'Current password is incorrect');
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: await bcrypt.hash(newPassword, 10), mustChangePassword: false },
+  });
+  res.json({ ok: true });
+}
+
+module.exports = { login, getProfile, changePassword };
