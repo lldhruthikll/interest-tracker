@@ -52,7 +52,7 @@ test('new member must change password before owner routes', async () => {
   const short = await api(srv.url, '/api/auth/change-password', { method: 'POST', token: m.token, body: { currentPassword: 'temp12345', newPassword: 'short' } });
   assert.equal(short.status, 400);
   const wrong = await api(srv.url, '/api/auth/change-password', { method: 'POST', token: m.token, body: { currentPassword: 'nope', newPassword: 'newpass123' } });
-  assert.equal(wrong.status, 401);
+  assert.deepEqual([wrong.status, wrong.body], [400, { error: 'Current password is incorrect' }]);
   const ok = await api(srv.url, '/api/auth/change-password', { method: 'POST', token: m.token, body: { currentPassword: 'temp12345', newPassword: 'newpass123' } });
   assert.equal(ok.status, 200);
   assert.equal((await api(srv.url, '/api/borrowers', { token: m.token })).status, 200);

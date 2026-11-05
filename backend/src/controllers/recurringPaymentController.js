@@ -12,9 +12,6 @@ function validate(agreement, { amount, paymentDate, method, notes }) {
   if (!METHODS.includes(method)) throw new ValidationError(`Method must be one of ${METHODS.join(', ')}`);
   if (!isValidDateStr(paymentDate)) throw new ValidationError('paymentDate must be a valid YYYY-MM-DD date');
   if (paymentDate < toDateOnly(agreement.startDate)) throw new ValidationError('Payment date is before the agreement start');
-  if (agreement.status === 'ENDED' && agreement.endDate && paymentDate > toDateOnly(agreement.endDate)) {
-    throw new ValidationError('Payment date is after the agreement end');
-  }
   if (paymentDate > todayIST()) throw new ValidationError('Payment date cannot be in the future');
   if (notes != null && typeof notes !== 'string') throw new ValidationError('Notes must be text');
   return { amount: fromPaise(amountPaise), paymentDate: toDbDate(paymentDate), method, notes: notes || null };

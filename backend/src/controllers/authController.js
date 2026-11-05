@@ -45,7 +45,7 @@ async function changePassword(req, res) {
   }
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (typeof currentPassword !== 'string' || !(await bcrypt.compare(currentPassword, user.password))) {
-    throw new HttpError(401, 'Current password is incorrect');
+    throw new HttpError(400, 'Current password is incorrect'); // not 401: the client logs out on 401
   }
   await prisma.user.update({
     where: { id: user.id },

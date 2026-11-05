@@ -3,9 +3,12 @@
 const IST_OFFSET_MS = 330 * 60 * 1000;
 const pad = (n) => String(n).padStart(2, '0');
 
+// IST calendar date of a timestamp (lending payment dates are timestamps, not @db.Date).
+const istDate = (ts) => new Date(ts.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
 function todayIST(now = new Date()) {
   if (process.env.NODE_ENV === 'test' && process.env.FAKE_TODAY) return process.env.FAKE_TODAY;
-  return new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+  return istDate(now);
 }
 
 // From a @db.Date value (Prisma returns UTC midnight).
@@ -35,4 +38,4 @@ const clampDay = (period, day) => `${period}-${pad(Math.min(day, daysInMonth(per
 const isValidDateStr = (s) =>
   typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(toDbDate(s)) && toDateOnly(toDbDate(s)) === s;
 
-module.exports = { todayIST, addDays, toDateOnly, toDbDate, periodOf, addMonths, daysInMonth, clampDay, isValidDateStr };
+module.exports = { todayIST, istDate, addDays, toDateOnly, toDbDate, periodOf, addMonths, daysInMonth, clampDay, isValidDateStr };

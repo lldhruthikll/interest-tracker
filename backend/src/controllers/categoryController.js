@@ -43,12 +43,13 @@ async function getCategory(req, res) {
       Object.assign(u, { agreement, status: await unitStatus(tx, u.id) });
     }
     return cat;
-  });
+  }, { timeout: 30000 });
   res.json(out);
 }
 
 // Per-category dashboard. Stats cover the shown places (all, or ?placeId=); pending/overdue are as of today,
-// "this month" is ?month= (default current IST month). Collected = allocations by payment date, advance applications excluded.
+// "this month" is ?month= (default current IST month). Collected = allocations by payment date, including advance
+// applied at move-out (an ADVANCE payment); deposits held and retained amounts are not collected.
 async function getDashboard(req, res) {
   const id = parseId(req.params.id);
   const month = monthParam(req.query.month);
@@ -105,11 +106,21 @@ async function getDashboard(req, res) {
   res.json(out);
 }
 
+// Archiving hides the parent from dashboards, so it must not strand tenants who still owe/pay.
+async function refuseArchiveWithActive(tx, data, label, unitWhere) {
+  if (data.archived && await tx.agreement.count({ where: { status: 'ACTIVE', unit: unitWhere } })) {
+    throw new HttpError(409, `${label} has active agreements; move them out first`);
+  }
+}
+
 async function updateCategory(req, res) {
   const id = parseId(req.params.id);
   const data = fields(req.body, CATEGORY, true);
-  await requireOwned(req.db, 'category', id);
-  res.json(await req.db.category.update({ where: { id }, data }));
+  res.json(await req.db.$transaction(async (tx) => {
+    await requireOwned(tx, 'category', id);
+    await refuseArchiveWithActive(tx, data, 'Category', { place: { categoryId: id } });
+    return tx.category.update({ where: { id }, data });
+  }));
 }
 
 async function deleteCategory(req, res) {
@@ -130,8 +141,12 @@ async function createPlace(req, res) {
 
 async function updatePlace(req, res) {
   const id = parseId(req.params.id);
-  await requireOwned(req.db, 'place', id);
-  res.json(await req.db.place.update({ where: { id }, data: fields(req.body, PLACE, true) }));
+  const data = fields(req.body, PLACE, true);
+  res.json(await req.db.$transaction(async (tx) => {
+    await requireOwned(tx, 'place', id);
+    await refuseArchiveWithActive(tx, data, 'Place', { placeId: id });
+    return tx.place.update({ where: { id }, data });
+  }));
 }
 
 async function createUnit(req, res) {

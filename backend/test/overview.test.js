@@ -45,7 +45,7 @@ test.beforeEach(async () => {
   ids = { bor: bor.id, cat: cat.id, pa: pa.id, pb: pb.id, g1: g1.id, g2: g2.id };
 });
 
-test('overview: received by payment date, advances excluded, pending/overdue, owedBack, trend, upcoming, overdueList', async () => {
+test('overview: received by payment date, deposits excluded, pending/overdue, owedBack, trend, upcoming, overdueList', async () => {
   const o = await A('GET', '/overview');
   const key = `category:${ids.cat}`;
   assert.equal(o.month, '2026-11');
@@ -85,11 +85,52 @@ test('move-out: applied advance counts as received on settlement date; retained 
   assert.deepEqual([oct.totals.received, oct.totals.advanceRetained], [0, 0]);
 });
 
-test('archived categories drop out of the overview', async () => {
+test('archived categories drop out of the overview; archive is refused while agreements are active', async () => {
+  assert.deepEqual(await A('PUT', `/categories/${ids.cat}`, { archived: true }, 409),
+    { error: 'Category has active agreements; move them out first' });
+  assert.deepEqual(await A('PUT', `/places/${ids.pb}`, { archived: true }, 409),
+    { error: 'Place has active agreements; move them out first' });
+  await A('PUT', `/categories/${ids.cat}`, { name: 'Rent 2' }); // non-archive edits still fine
+  for (const g of [ids.g1, ids.g2]) {
+    await A('POST', `/agreements/${g}/move-out`, { endDate: '2026-11-04', applyAdvance: false, retained: null });
+  }
+  await A('PUT', `/places/${ids.pb}`, { archived: true });
   await A('PUT', `/categories/${ids.cat}`, { archived: true });
   const o = await A('GET', '/overview');
   assert.deepEqual(o.ledgers.map((l) => l.key), ['lending']);
   assert.deepEqual(o.owedBack, { advances: 0, credit: 0 });
+});
+
+test('ENDED agreement: payment dated after the end (not future, capped at unpaid) counts in its own month', async () => {
+  // B-1 moves out 10-28 owing October's ₹3,000; pays a week later, dated that day
+  await A('POST', `/agreements/${ids.g2}/move-out`, { endDate: '2026-10-28', lastMonthRule: 'FULL', applyAdvance: false, retained: null });
+  await A('POST', '/recurring-payments', { agreementId: ids.g2, amount: 3000, paymentDate: '2026-11-05', method: 'CASH' }, 400); // future
+  await A('POST', '/recurring-payments', { agreementId: ids.g2, amount: 3001, paymentDate: '2026-11-04', method: 'CASH' }, 400); // > unpaid
+  await A('POST', '/recurring-payments', { agreementId: ids.g2, amount: 3000, paymentDate: '2026-11-04', method: 'CASH' }, 201);
+  const key = `category:${ids.cat}`;
+  const o = await A('GET', '/overview');
+  assert.deepEqual(o.ledgers.find((l) => l.key === key).received, 10000);
+  assert.equal((await A('GET', '/overview?month=2026-10')).ledgers.find((l) => l.key === key).received, 0);
+  assert.equal((await A('GET', `/categories/${ids.cat}/dashboard`)).stats.collectedThisMonth, 10000);
+  assert.equal((await A('GET', `/agreements/${ids.g2}`)).balances.unpaidPaise, 0);
+});
+
+test('agreement detail lists the other agreements on the unit, newest first', async () => {
+  await A('POST', `/agreements/${ids.g2}/move-out`, { endDate: '2026-10-20', applyAdvance: false, retained: null });
+  const g = await A('GET', `/agreements/${ids.g2}`);
+  const unitId = g.unitId;
+  const g3 = await A('POST', '/agreements', { ...moveIn, startDate: '2026-10-21', unitId, amount: 3000, newPayer: { name: 'Gita', phone: '7' } }, 201);
+  await A('POST', `/agreements/${g3.id}/move-out`, { endDate: '2026-10-31', applyAdvance: false, retained: null });
+  const g4 = await A('POST', '/agreements', { ...moveIn, startDate: '2026-11-01', unitId, amount: 3000, newPayer: { name: 'Hari', phone: '6' } }, 201);
+  const d = await A('GET', `/agreements/${g4.id}`);
+  const day = (x) => x && x.slice(0, 10);
+  assert.deepEqual(d.pastAgreements.map((p) => [p.id, p.payer.name, day(p.startDate), day(p.endDate), p.status]), [
+    [g3.id, 'Gita', '2026-10-21', '2026-10-31', 'ENDED'], [ids.g2, 'Sita', '2026-10-01', '2026-10-20', 'ENDED']]);
+  assert.deepEqual(Object.keys(d.pastAgreements[0]).sort(), ['endDate', 'id', 'payer', 'startDate', 'status']);
+  assert.deepEqual(Object.keys(d.pastAgreements[0].payer).sort(), ['id', 'name']);
+  assert.deepEqual((await A('GET', `/agreements/${ids.g2}`)).pastAgreements.map((p) => [p.id, p.status]),
+    [[g4.id, 'ACTIVE'], [g3.id, 'ENDED']]);
+  assert.deepEqual((await A('GET', `/agreements/${ids.g1}`)).pastAgreements, []);
 });
 
 test('B sees nothing of A in overview, dashboard, calendar, export', async () => {

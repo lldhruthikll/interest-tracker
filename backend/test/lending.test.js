@@ -39,6 +39,7 @@ test('due dates: monthly from the month after start, clamped to month end', () =
   assert.deepEqual(getDueDatesForLoan('2026-01-31', '2026-04-29'), ['2026-02-28', '2026-03-31']);
   assert.deepEqual(getDueDatesForLoan('2026-12-10', '2027-01-10'), ['2027-01-10']);
   assert.deepEqual(getDueDatesForLoan('2026-06-10', '2026-07-09'), []);
+  for (const bad of [null, 'x', '2026-02-30']) assert.throws(() => getDueDatesForLoan('2026-06-10', bad)); // would loop forever
 });
 
 test('FIFO payment, edit and delete restore paid amounts', async () => {

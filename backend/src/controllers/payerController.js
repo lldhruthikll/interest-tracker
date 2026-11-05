@@ -34,7 +34,7 @@ async function getPayer(req, res) {
     }
     const user = await tx.user.findUnique({ where: { payerId: id }, ...LOGIN });
     return { ...withLogin({ ...payer, user }), agreements };
-  });
+  }, { timeout: 30000 });
   res.json(out);
 }
 

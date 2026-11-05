@@ -134,9 +134,11 @@ test('validation: amount, dates, method, ended agreement', async () => {
   for (const b of bad) assert.equal((await pay('PUT', `/${p.body.payment.id}`, b)).status, 400, `PUT ${JSON.stringify(b)}`);
 
   await db.agreement.update({ where: { id: agr.id }, data: { status: 'ENDED', endDate: toDbDate('2026-05-31') } });
-  assert.equal((await pay('POST', '', { ...ok, paymentDate: '2026-06-01' })).status, 400);
+  assert.equal((await pay('POST', '', { ...ok, paymentDate: '2026-06-06' })).status, 400); // still not in the future
+  assert.equal((await pay('POST', '', { ...ok, paymentDate: '2026-03-24' })).status, 400); // nor before the start
+  assert.equal((await pay('POST', '', { ...ok, paymentDate: '2026-06-01' })).status, 201); // after the end is fine
   assert.equal((await pay('POST', '', { ...ok, paymentDate: '2026-05-31' })).status, 201);
-  assert.equal(await db.recurringPayment.count(), 2);
+  assert.equal(await db.recurringPayment.count(), 3);
   assert.deepEqual((await dues()).map((d) => d[0]), ['2026-03', '2026-04', '2026-05']); // ENDED: June due removed
 });
 

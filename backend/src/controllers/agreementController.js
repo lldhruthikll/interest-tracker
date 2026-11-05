@@ -40,7 +40,10 @@ async function detail(tx, id) {
     rateChanges: { orderBy: { effectiveFrom: 'asc' } }, dues: { orderBy: { period: 'asc' } },
     payments: { orderBy: [{ paymentDate: 'desc' }, { id: 'desc' }], include: { allocations: true } },
     advances: { orderBy: { id: 'asc' } } } });
-  return { ...a, balances: await agreementBalances(tx, id) };
+  const pastAgreements = await tx.agreement.findMany({ where: { unitId: a.unitId, id: { not: id } },
+    orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+    select: { id: true, payer: { select: { id: true, name: true } }, startDate: true, endDate: true, status: true } });
+  return { ...a, balances: await agreementBalances(tx, id), pastAgreements };
 }
 
 // requireOwned (404), lock, then re-read so the status check sees the last committed writer.
@@ -94,7 +97,7 @@ async function getAgreement(req, res) {
     const a = await requireOwned(tx, 'agreement', id);
     if (a.status === 'ACTIVE') await syncAgreement(tx, id);
     return detail(tx, id);
-  }));
+  }, { timeout: 30000 }));
 }
 
 async function updateBilling(req, res) {

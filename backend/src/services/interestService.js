@@ -1,5 +1,5 @@
 const { toPaise, fromPaise } = require('../lib/money');
-const { todayIST, toDateOnly, toDbDate, periodOf, addMonths, clampDay } = require('../lib/dates');
+const { todayIST, toDateOnly, toDbDate, periodOf, addMonths, clampDay, isValidDateStr } = require('../lib/dates');
 const { planFifo } = require('./allocation');
 
 const MONTH_NAMES = [
@@ -12,6 +12,7 @@ const MONTH_NAMES = [
  * Start 2026-03-15 → 2026-04-15, 2026-05-15, ...; days past month end clamp (Jan 31 → Feb 28).
  */
 function getDueDatesForLoan(startDateStr, targetDateStr = todayIST()) {
+  if (!isValidDateStr(targetDateStr)) throw new Error(`getDueDatesForLoan: invalid targetDateStr ${targetDateStr}`); // else loops forever
   const day = Number(startDateStr.slice(8, 10));
   const dueDates = [];
   for (let period = addMonths(periodOf(startDateStr), 1); ; period = addMonths(period, 1)) {

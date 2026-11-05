@@ -3,13 +3,12 @@
 // Retained advance is reported apart as advanceRetained, never in received.
 const { toPaise } = require('../lib/money');
 const { ValidationError } = require('../lib/errors');
-const { todayIST, addDays, addMonths, toDateOnly, toDbDate, periodOf, isValidDateStr } = require('../lib/dates');
+const { todayIST, istDate, addDays, addMonths, toDateOnly, toDbDate, periodOf, isValidDateStr } = require('../lib/dates');
 const { buildSchedule } = require('../services/schedule');
 const { getDueDatesForLoan, syncAllActiveLoans } = require('../services/interestService');
 const { scheduleInput, syncOwner, agreementBalances } = require('../services/recurringSync');
 
-const IST_MS = 330 * 60 * 1000;
-const istPeriod = (ts) => new Date(ts.getTime() + IST_MS).toISOString().slice(0, 7);
+const istPeriod = (ts) => istDate(ts).slice(0, 7);
 const rupees = (paise) => paise / 100;
 const LENDING = { key: 'lending', name: 'Lending' };
 const catKey = (id) => `category:${id}`;

@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const { syncAllActiveLoans } = require('../services/interestService');
 const { toPaise } = require('../lib/money');
-const { todayIST, toDateOnly } = require('../lib/dates');
+const { todayIST, istDate, toDateOnly } = require('../lib/dates');
 const { parseId } = require('../lib/errors');
 const { requireOwned } = require('../lib/ownerDb');
 const { syncCategory } = require('../services/recurringSync');
@@ -83,7 +83,7 @@ async function exportExcelReport(req, res) {
       .join(', ');
     return {
       'Payment ID': p.id,
-      'Date': new Date(p.paymentDate).toISOString().split('T')[0],
+      'Date': istDate(p.paymentDate),
       'Borrower Name': p.borrower.name,
       'Phone': p.borrower.phone,
       'Total Amount Paid (₹)': Number(p.amount),
