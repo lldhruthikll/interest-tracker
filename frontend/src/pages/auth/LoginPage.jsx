@@ -34,7 +34,7 @@ export default function LoginPage() {
       <Backdrop />
       <form onSubmit={submit} className="glass w-full max-w-sm rounded-xl3 p-8" noValidate>
         <div className="mb-6 flex items-center gap-2 text-xl font-black">
-          <Logo className="h-8 w-8 rounded-xl" />
+          <Logo className="h-8 w-8" />
           FinLedger
         </div>
         <h1 className="mb-1 text-2xl font-black">Sign in</h1>

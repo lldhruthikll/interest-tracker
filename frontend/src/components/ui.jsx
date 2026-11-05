@@ -41,7 +41,13 @@ export function StatusPill({ status }) {
   );
 }
 
-export const Logo = ({ className = 'h-[26px] w-[26px] rounded-[9px]' }) => <span aria-hidden="true" className={cx('inline-block bg-ink', className)} />;
+// Ledger lines with a check mark ("settled entry"); same mark as public/favicon.svg.
+export const Logo = ({ className = 'h-[26px] w-[26px]' }) => (
+  <svg aria-hidden="true" viewBox="0 0 32 32" fill="none" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={cx('shrink-0 text-ink', className)}>
+    <rect width="32" height="32" rx="9" fill="currentColor" />
+    <path d="M9 11h14M9 16h8M16.5 21.5l2.5 2.5 5-5" className="stroke-base" />
+  </svg>
+);
 
 // Soft blurred grey shapes behind the page; colors come from theme tokens.
 export const Backdrop = () => (
