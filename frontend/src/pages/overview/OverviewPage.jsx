@@ -116,7 +116,7 @@ export default function OverviewPage() {
               <Swatch fill={fillOf(i)} />{l.name}
             </h2>
             <dl className="grid grid-cols-2 gap-2 text-sm">
-              {[['Received', l.received, 'paid'], ['Pending', l.pending, 'partial'], ['Overdue', l.overdue, 'overdue'], ['Advance retained', l.advanceRetained, 'neutral']].map(([k, v, tone]) => (
+              {[['Received', l.received, 'paid'], ['Pending', l.pending, 'partial'], ['Overdue', l.overdue, 'overdue'], ...(l.key === 'lending' ? [] : [['Advance retained', l.advanceRetained, 'neutral']])].map(([k, v, tone]) => (
                 <div key={k} className={`tone-${tone} rounded-2xl px-3 py-2`}>
                   <dt className="text-[11px] font-extrabold">{k}</dt>
                   <dd className="font-black tabnum">{formatINR(v)}</dd>

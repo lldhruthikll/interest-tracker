@@ -10,7 +10,7 @@ const pad = (n) => String(n).padStart(2, '0');
 export function eventState(e, today) {
   if (e.status === 'PAID' || (e.amount > 0 && e.paid >= e.amount)) return ['paid', 'Paid'];
   if (e.paid > 0) return ['partial', 'Partial'];
-  return e.date < today ? ['overdue', 'Overdue'] : ['neutral', 'Upcoming'];
+  return e.date < today ? ['overdue', 'Overdue'] : e.date === today ? ['neutral', 'Due today'] : ['neutral', 'Upcoming'];
 }
 
 // Controlled month grid: `month` is {year, month0}; events are /calendar items.

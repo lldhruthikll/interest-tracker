@@ -1,3 +1,5 @@
+import { todayIST } from '../lib/format';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiFetch(endpoint, options = {}) {
@@ -16,7 +18,7 @@ export async function apiFetch(endpoint, options = {}) {
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
-  if (response.status === 401 && endpoint !== '/auth/login') {
+  if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/change-password') {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
@@ -48,6 +50,7 @@ export const api = {
   changePassword: (data) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
   getCategories: () => apiFetch('/categories'),
+  getAllCategories: () => apiFetch('/categories?all=1'),
   getCategory: (id) => apiFetch(`/categories/${id}`),
   createCategory: (d) => apiFetch('/categories', { method: 'POST', body: JSON.stringify(d) }),
   updateCategory: (id, d) => apiFetch(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
@@ -63,14 +66,14 @@ export const api = {
     const q = new URLSearchParams();
     if (placeId) q.set('placeId', placeId);
     if (month) q.set('month', month);
-    return apiFetch(`/categories/${id}/dashboard${q.size ? `?${q}` : ''}`);
+    return apiFetch(`/categories/${id}/dashboard${q.toString() ? `?${q}` : ''}`);
   },
   exportCategory: async (id, name) => {
     const blob = await apiFetch(`/categories/${id}/export`);
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${name}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.download = `${name}_${todayIST()}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -136,7 +139,7 @@ export const api = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Interest_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.download = `Interest_Report_${todayIST()}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();

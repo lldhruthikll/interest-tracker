@@ -7,7 +7,7 @@ const METHODS = [['CASH', 'Cash'], ['UPI', 'UPI'], ['BANK', 'Bank'], ['CHEQUE', 
 
 // agreements: [{id, label, unpaid?}] to pick from; or pass fixed `agreement` {id,label}. `payment` = edit mode.
 export default function RecurringPaymentModal({ open, agreements = [], agreement, payment, unpaid, onClose, onDone }) {
-  const [agId, setAgId] = useState(agreement?.id ?? agreements[0]?.id ?? '');
+  const [agId, setAgId] = useState(String(agreement?.id ?? agreements[0]?.id ?? ''));
   const [q, setQ] = useState('');
   const [f, setF] = useState({
     amount: payment?.amount ?? '', paymentDate: payment ? String(payment.paymentDate).slice(0, 10) : todayIST(),
@@ -15,7 +15,7 @@ export default function RecurringPaymentModal({ open, agreements = [], agreement
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const shown = useMemo(() => agreements.filter((a) => a.label.toLowerCase().includes(q.toLowerCase()) || a.id === agId), [agreements, q, agId]);
+  const shown = useMemo(() => agreements.filter((a) => a.label.toLowerCase().includes(q.toLowerCase()) || String(a.id) === agId), [agreements, q, agId]);
   const current = agreement || agreements.find((a) => String(a.id) === String(agId));
   const [fetched, setFetched] = useState(null);
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function RecurringPaymentModal({ open, agreements = [], agreement
         </div>
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save payment'}</Button>
+          <Button type="submit" disabled={busy || !agId}>{busy ? 'Saving…' : 'Save payment'}</Button>
         </div>
       </form>
     </Modal>

@@ -35,7 +35,9 @@ export default function MoveOutModal({ open, agreement, onClose, onDone }) {
     retP = paise(retained || 0);
     refund = { advance: pv.advanceHeldPaise - applied - retP, credit: pv.creditPaise };
   }
+  const needReason = retP > 0 && !reason.trim();
   const bad = refund && (retP < 0 || refund.advance < 0);
+  const badWhy = retP < 0 ? 'Retained amount cannot be negative.' : 'Retained amount is more than the advance left after applying it to dues.';
   const unpaidAfter = pv ? pv.unpaidPaise - applied : 0;
   const open_ = pv ? pv.dues.filter((d) => paise(d.amount) > paise(d.paidAmount)) : [];
 
@@ -76,9 +78,11 @@ export default function MoveOutModal({ open, agreement, onClose, onDone }) {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Amount retained (₹)" type="number" min="0" step="0.01" value={retained} onChange={(e) => setRetained(e.target.value)} />
                   <Field label="Reason for retaining" value={reason} onChange={(e) => setReason(e.target.value)} />
+                  {needReason && <p className="text-sm font-bold sm:col-span-2">Enter a reason for retaining this amount.</p>}
                 </div>
               </>
             )}
+            {bad && <p role="alert" className="text-sm font-bold">{badWhy}</p>}
             <div className="glass-in space-y-1 rounded-2xl p-4 text-sm font-bold tabnum">
               {applied > 0 && <div className="flex justify-between"><span>Advance applied to dues</span><span>{formatINR(applied / 100)}</span></div>}
               {unpaidAfter > 0 && <div className="flex justify-between"><span>Still unpaid after move-out</span><span>{formatINR(unpaidAfter / 100)}</span></div>}
@@ -91,7 +95,7 @@ export default function MoveOutModal({ open, agreement, onClose, onDone }) {
         )}
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button disabled={!pv || bad || busy} onClick={confirm}>{busy ? 'Saving…' : 'Confirm move out'}</Button>
+          <Button disabled={!pv || bad || needReason || busy} onClick={confirm}>{busy ? 'Saving…' : 'Confirm move out'}</Button>
         </div>
       </div>
     </Modal>

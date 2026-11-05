@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeSwitch } from '../../lib/theme';
 import { Button, Card, Table, Field, Loading, ErrorNote, PageHeader } from '../../components/ui';
@@ -78,6 +79,25 @@ function FamilyCard() {
   );
 }
 
+function ArchivedCard() {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { api.getAllCategories().then((c) => setRows(c.filter((x) => x.archived))).catch(() => setRows([])); }, []);
+  if (!rows?.length) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="text-lg font-black">Archived categories</h2>
+      <ul className="space-y-2">
+        {rows.map((c) => (
+          <li key={c.id} className="glass-in flex items-center justify-between gap-3 rounded-2xl p-3.5">
+            <span className="font-extrabold">{c.name}</span>
+            <Link className="btn !px-3 !py-1.5 text-sm" to={`/c/${c.id}/settings`}>Open to restore</Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   return (
@@ -85,6 +105,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" sub={user?.name} />
       <Card><ThemeSwitch /></Card>
       <PasswordCard />
+      <ArchivedCard />
       {user?.role === 'ADMIN' && <FamilyCard />}
     </div>
   );

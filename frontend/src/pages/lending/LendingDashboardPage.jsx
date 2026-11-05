@@ -6,7 +6,7 @@ import { Button, Card, StatCard, StatusPill, Select, Table, Loading, ErrorNote, 
 import NotificationBanner from '../../components/NotificationBanner';
 import PaymentModal from '../../components/PaymentModal';
 import BorrowerFormModal from '../../components/BorrowerFormModal';
-import { formatINR, formatDate } from '../../lib/format';
+import { formatINR, formatDate, todayIST } from '../../lib/format';
 
 export default function LendingDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -18,9 +18,8 @@ export default function LendingDashboardPage() {
   const [isBorrowerModalOpen, setIsBorrowerModalOpen] = useState(false);
   const [selectedBorrowerForPayment, setSelectedBorrowerForPayment] = useState(null);
 
-  const now = new Date();
-  const [analyticsYear, setAnalyticsYear] = useState(now.getFullYear());
-  const [analyticsMonth, setAnalyticsMonth] = useState(now.getMonth() + 1);
+  const [analyticsYear, setAnalyticsYear] = useState(() => Number(todayIST().slice(0, 4)));
+  const [analyticsMonth, setAnalyticsMonth] = useState(() => Number(todayIST().slice(5, 7)));
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
@@ -167,7 +166,7 @@ const COLLECTED = 'rgb(var(--c1))'; // solid ink
 const PENDING = 'rgb(var(--c3))'; // light grey, outlined
 
 function AnalyticsSection({ analyticsData, analyticsLoading, analyticsYear, analyticsMonth, onYearChange, onMonthChange }) {
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number(todayIST().slice(0, 4));
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
   const { monthlyTrend = [], selectedMonthSummary = {}, borrowerBreakdown = [] } = analyticsData || {};
   const s = selectedMonthSummary;

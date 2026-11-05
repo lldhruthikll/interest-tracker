@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Field, Backdrop, Logo } from '../../components/ui';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const from = state?.from ? `${state.from.pathname || '/'}${state.from.search || ''}` : '/';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={from} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -19,7 +21,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await login(username.trim(), password);
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {

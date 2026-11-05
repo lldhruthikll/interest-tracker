@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button, Card, Chips, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
@@ -21,8 +21,14 @@ export default function CategoryDashboardPage() {
   const [paying, setPaying] = useState(false);
 
   useEffect(() => { setPlaceId(''); setData(null); }, [categoryId]);
-  const load = useCallback(() => api.getCategoryDashboard(categoryId, placeId).then((d) => { setData(d); setError(''); }).catch((e) => setError(e.message)), [categoryId, placeId]);
-  useEffect(() => { load(); }, [load]);
+  const live = useRef(0); // latest request wins; a stale response never overwrites newer data
+  const load = useCallback(() => {
+    const n = ++live.current;
+    return api.getCategoryDashboard(categoryId, placeId)
+      .then((d) => { if (n === live.current) { setData(d); setError(''); } })
+      .catch((e) => { if (n === live.current) setError(e.message); });
+  }, [categoryId, placeId]);
+  useEffect(() => { load(); return () => { live.current += 1; }; }, [load]);
 
   if (catError || error) return <ErrorNote>{catError || error}</ErrorNote>;
   if (!cat || !data) return <Loading />;
@@ -59,11 +65,11 @@ export default function CategoryDashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Collected this month" value={formatINR(s.collectedThisMonth)} note={`of ${formatINR(s.dueThisMonth)} due`} tone="paid" />
+        <StatCard label="Received this month" value={formatINR(s.collectedThisMonth)} note={`of ${formatINR(s.dueThisMonth)} due`} tone="paid" />
         <StatCard label="Pending" value={formatINR(s.pending)} note={s.overdue ? `${formatINR(s.overdue)} overdue` : 'Nothing overdue'} tone={s.overdue ? 'overdue' : 'partial'} />
-        <StatCard label="Advances held" value={formatINR(s.advancesHeld)} note="Not income" tone="advance" />
+        <StatCard label="Owed back (not income)" value={formatINR(s.advancesHeld + s.credit)}
+          note={`Advances ${formatINR(s.advancesHeld)} · Credit ${formatINR(s.credit)}`} tone="advance" />
         <StatCard label="Occupied" value={`${s.occupied} of ${s.totalUnits}`} note={`${L.unit.toLowerCase()} in use`} tone="neutral" />
-        {s.credit > 0 && <StatCard label="Credit (paid ahead)" value={formatINR(s.credit)} note="Not income" tone="advance" />}
         {s.advanceRetained > 0 && <StatCard label="Advance retained" value={formatINR(s.advanceRetained)} note="This month" tone="paid" />}
       </div>
 

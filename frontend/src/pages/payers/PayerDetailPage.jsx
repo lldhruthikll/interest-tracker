@@ -4,6 +4,34 @@ import { api } from '../../api/client';
 import { Button, Card, StatusPill, Table, Field, Loading, ErrorNote, PageHeader } from '../../components/ui';
 import { formatINR, formatDate } from '../../lib/format';
 
+function EditPayerCard({ payer, reload }) {
+  const [f, setF] = useState({ name: payer.name, phone: payer.phone || '', notes: payer.notes || '' });
+  const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setMsg('');
+    if (!f.name.trim()) return setError('Name is required.');
+    try { await api.updatePayer(payer.id, { name: f.name.trim(), phone: f.phone.trim(), notes: f.notes.trim() }); setMsg('Saved.'); await reload(); }
+    catch (err) { setError(err.message); }
+  };
+  return (
+    <Card>
+      <form onSubmit={submit} className="space-y-3" noValidate>
+        <h2 className="text-lg font-black">Details</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Name" value={f.name} onChange={set('name')} />
+          <Field label="Phone" value={f.phone} onChange={set('phone')} />
+          <Field label="Notes" value={f.notes} onChange={set('notes')} />
+        </div>
+        <ErrorNote>{error}</ErrorNote>
+        {msg && <p role="status" className="font-bold">{msg}</p>}
+        <Button type="submit">Save details</Button>
+      </form>
+    </Card>
+  );
+}
+
 function LoginCard({ payer, reload }) {
   const [f, setF] = useState({ username: '', password: '' });
   const [pw, setPw] = useState('');
@@ -67,6 +95,7 @@ export default function PayerDetailPage() {
         <Link className="btn" to="/payers">Back</Link>
       </PageHeader>
       <Table columns={cols} rows={p.agreements} empty="No agreements yet." />
+      <EditPayerCard key={`${p.name}|${p.phone}|${p.notes}`} payer={p} reload={load} />
       <LoginCard payer={p} reload={load} />
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Button, Card, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
+import { Button, Card, Modal, Field, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
 import { formatINR, formatDate, formatAnyDate, periodLabel, todayIST } from '../../lib/format';
 import RecurringPaymentModal from './modals/RecurringPaymentModal';
 import RentChangeModal from './modals/RentChangeModal';
@@ -18,6 +18,31 @@ function dueStatus(d, today) {
   if (paid >= amt) return 'PAID';
   if (paid > 0) return 'PARTIAL';
   return String(d.dueDate).slice(0, 10) < today ? 'OVERDUE' : 'PENDING';
+}
+function AdvanceModal({ agreementId, onClose, onDone }) {
+  const [f, setF] = useState({ amount: '', date: todayIST(), notes: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await api.addAdvance(agreementId, { type: 'RECEIVED', amount: f.amount, date: f.date, notes: f.notes.trim() }); onDone(); }
+    catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open title="Add advance received" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <ErrorNote>{error}</ErrorNote>
+        <Field label="Amount (₹)" type="number" min="0" step="0.01" required value={f.amount} onChange={set('amount')} />
+        <Field label="Date" type="date" required max={todayIST()} value={f.date} onChange={set('date')} />
+        <Field label="Notes (optional)" value={f.notes} onChange={set('notes')} />
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={busy || !(Number(f.amount) > 0)}>{busy ? 'Saving…' : 'Save advance'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 const Section = ({ title, children }) => <Card className="space-y-3"><h2 className="text-lg font-black">{title}</h2>{children}</Card>;
 const Row = ({ k, v }) => <div className="flex justify-between gap-4 py-1"><dt className="font-bold text-muted">{k}</dt><dd className="text-right font-extrabold tabnum">{v}</dd></div>;
@@ -72,7 +97,7 @@ export default function AgreementDetailPage() {
     <div className="space-y-6">
       <PageHeader title={`${a.unit.name} · ${a.payer.name}`} sub={`${cat.name} · ${cat.placeLabel}: ${a.unit.place.name}${ended ? ` · Ended ${formatAnyDate(a.endDate)}` : ''}`}>
         <Link className="btn" to={`/c/${cat.id}`}>Back</Link>
-        {!ended && <Button onClick={() => setModal('pay')}>+ Record payment</Button>}
+        {(!ended || b.unpaidPaise > 0) && <Button onClick={() => setModal('pay')}>+ Record payment</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('rent')}>Change rent</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('billing')}>Billing settings</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('out')}>Move out</Button>}
@@ -104,6 +129,16 @@ export default function AgreementDetailPage() {
 
       <Section title="Monthly dues"><Table columns={duesCols} rows={a.dues} empty="No dues yet." /></Section>
       <Section title="Payments"><Table columns={payCols} rows={a.payments} empty="No payments yet." /></Section>
+      {a.pastAgreements?.length > 0 && (
+        <Section title={`Past tenants on this ${cat.unitLabel.toLowerCase()}`}>
+          <Table columns={[
+            { key: 'payer', header: cat.payerLabel, render: (x) => <Link className="font-extrabold text-ink underline" to={`/agreements/${x.id}`}>{x.payer?.name}</Link> },
+            { key: 'start', header: 'From', render: (x) => formatAnyDate(x.startDate) },
+            { key: 'end', header: 'To', render: (x) => (x.endDate ? formatAnyDate(x.endDate) : '—') },
+            { key: 'status', header: 'Status', render: (x) => <StatusPill status={x.status} /> },
+          ]} rows={a.pastAgreements} />
+        </Section>
+      )}
       <Section title="Rent history">
         <Table columns={[
           { key: 'effectiveFrom', header: 'From', render: (r) => periodLabel(r.effectiveFrom) },
@@ -111,6 +146,7 @@ export default function AgreementDetailPage() {
         ]} rows={a.rateChanges} />
       </Section>
       <Section title="Advance">
+        {!ended && <div><Button variant="secondary" onClick={() => setModal('adv')}>Add advance received</Button></div>}
         <Table columns={[
           { key: 'date', header: 'Date', render: (e) => formatAnyDate(e.date) },
           { key: 'type', header: 'Type', render: (e) => ADV[e.type] || e.type },
@@ -121,6 +157,7 @@ export default function AgreementDetailPage() {
 
       {modal === 'pay' && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100} onClose={() => setModal(null)} onDone={done} />}
       {modal?.edit && <RecurringPaymentModal open agreement={{ id: a.id, label }} payment={modal.edit} onClose={() => setModal(null)} onDone={done} />}
+      {modal === 'adv' && <AdvanceModal agreementId={a.id} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'rent' && <RentChangeModal open agreementId={a.id} current={currentRate?.amount} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'billing' && <BillingModal open agreement={a} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'out' && <MoveOutModal open agreement={a} onClose={() => setModal(null)} onDone={done} />}
