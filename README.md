@@ -55,7 +55,7 @@ cp .env.test.example .env.test       # DATABASE_URL -> localhost:5436/finledger_
 
 node scripts/local.js npx prisma migrate deploy   # create/upgrade the dev schema
 npm run db:test:reset                             # test schema
-node scripts/local.js node scripts/create-admin.js   # empty DB only: creates the first admin
+node scripts/local.js node scripts/create-admin.js --username admin --password <8+ chars> --name Admin   # empty DB only
 npm run dev                                       # API on http://localhost:5000
 npm test                                          # full backend test suite
 ```
@@ -80,12 +80,15 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## 🐳 Docker Deployment
+## 🐳 Docker Compose (local development only)
 
-To launch the full stack (PostgreSQL, Backend API, Nginx Frontend) with a single command:
+The compose stack (PostgreSQL, Backend API, Nginx Frontend) is for local use, not production. It needs a `JWT_SECRET` from your shell or a repo-root `.env` (any random value; never reuse a production secret). The backend allows `CORS_ORIGIN=http://localhost:3000`. Run from the repo root:
 
 ```bash
-docker-compose up --build -d
+export JWT_SECRET="$(openssl rand -hex 32)"
+docker compose up --build -d
+docker compose exec backend npx prisma migrate deploy        # create/upgrade the schema (not run on start)
+docker compose exec backend node scripts/create-admin.js --username admin --password <8+ chars> --name Admin   # empty DB only
 ```
 
 - Frontend: `http://localhost:3000`
