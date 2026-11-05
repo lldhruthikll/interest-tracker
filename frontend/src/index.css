@@ -70,6 +70,7 @@
     background: var(--field); border: 1px solid var(--field-border);
     @apply w-full rounded-xl2 px-4 py-3 text-ink font-medium placeholder:text-muted outline-none focus:ring-2 focus:ring-ink;
   }
+  .field-select { appearance: none; @apply pr-10 cursor-pointer; }
   .pill { @apply inline-block rounded-full px-3 py-1 text-[11px] font-bold; }
 
   .blob { position: absolute; border-radius: 9999px; filter: blur(60px); }
@@ -79,6 +80,25 @@
 }
 
 .tabnum { font-variant-numeric: tabular-nums; }
+
+/* Styled dropdown list where the browser supports it (Chrome/Edge 135+); elsewhere the closed box is styled
+   and the open list stays the browser's own. Keyboard and screen-reader behavior stay native either way. */
+@supports (appearance: base-select) {
+  select.field-select, select.field-select::picker(select) { appearance: base-select; }
+  select.field-select > button { all: unset; display: block; flex: 1; min-width: 0; }
+  select.field-select selectedcontent { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  select.field-select::picker-icon { display: none; }
+  select.field-select::picker(select) {
+    width: anchor-size(width); margin-block: 6px; padding: 6px; border-radius: 16px; max-height: min(320px, 50vh);
+    background: var(--glass-pop); border: 1px solid var(--btn-border); box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(18px) saturate(120%); color: rgb(var(--ink));
+  }
+  select.field-select option { white-space: normal; padding: 9px 12px; border-radius: 10px; font-weight: 500; gap: 10px; }
+  select.field-select option:hover, select.field-select option:focus-visible { background: rgb(var(--ink) / .08); outline: none; }
+  select.field-select option:checked { font-weight: 700; }
+  select.field-select option::checkmark { order: 1; margin-left: auto; }
+  select.field-select option:disabled { color: rgb(var(--muted)); }
+}
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgb(var(--ink) / .3); border-radius: 9999px; }

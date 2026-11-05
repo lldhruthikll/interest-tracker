@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -83,7 +83,8 @@ export function useDialog(open, onClose, ref) {
     const el = ref.current;
     (el.querySelector('[data-autofocus],input,select,textarea,button:not([data-close])') || el).focus();
     const onKey = (e) => {
-      if (e.key === 'Escape') return cb.current();
+      // An open styled dropdown (focus on one of its options) closes itself on Escape; don't close the dialog too.
+      if (e.key === 'Escape') return e.target.closest?.('select') && e.target.tagName !== 'SELECT' ? undefined : cb.current();
       if (e.key !== 'Tab') return;
       const f = [...el.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled);
       if (!f.length) { e.preventDefault(); return; }
@@ -127,15 +128,29 @@ export function Field({ label, error, className, ...p }) {
   );
 }
 
+// Browsers with styled dropdowns (see index.css) show the chosen option through <selectedcontent>, which lets long
+// choices end in "…". Added outside React because React 18 warns about a <button> inside <select>.
+const withTrigger = (s) => {
+  if (!s || s.querySelector(':scope > button')) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.tabIndex = -1;
+  b.append(document.createElement('selectedcontent'));
+  s.prepend(b);
+};
+
 export function Select({ label, error, options = [], className, children, ...p }) {
   const id = useId();
   return (
     <div className={className}>
       {label && <label htmlFor={id} className="block text-sm font-semibold mb-1.5">{label}</label>}
-      <select id={id} className="field" {...p}>
-        {children || options.map((o) => (typeof o === 'object'
-          ? <option key={o.value} value={o.value}>{o.label}</option> : <option key={o} value={o}>{o}</option>))}
-      </select>
+      <div className="relative">
+        <select ref={withTrigger} id={id} className="field field-select" {...p}>
+          {children || options.map((o) => (typeof o === 'object'
+            ? <option key={o.value} value={o.value}>{o.label}</option> : <option key={o} value={o}>{o}</option>))}
+        </select>
+        <ChevronDown aria-hidden="true" size={18} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" />
+      </div>
       {error && <p role="alert" className="text-sm font-bold text-ink mt-1">{error}</p>}
     </div>
   );
