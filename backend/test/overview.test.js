@@ -69,6 +69,21 @@ test('overview: received by payment date, deposits excluded, pending/overdue, ow
   for (const q of ['month=2026-13', 'month=x', 'months=0', 'months=25']) await A('GET', `/overview?${q}`, undefined, 400);
 });
 
+test('overview: money lent out, money I owe (cleared people hidden), net = received − repaid in the month', async () => {
+  const asif = await A('POST', '/creditors', { name: 'Asif', amount: 200000, date: '2026-01-01' }, 201);
+  await A('POST', `/creditors/${asif.id}/entries`, { type: 'REPAID', amount: 1000, date: '2026-10-15' }, 201);
+  await A('POST', `/creditors/${asif.id}/entries`, { type: 'REPAID', amount: 1500, date: '2026-11-02' }, 201);
+  const ali = await A('POST', '/creditors', { name: 'Ali', amount: 500, date: '2026-01-01' }, 201);
+  await A('POST', `/creditors/${ali.id}/entries`, { type: 'REPAID', amount: 500, date: '2026-01-02' }, 201);
+
+  const o = await A('GET', '/overview');
+  assert.equal(o.lentOut, 10000);
+  assert.deepEqual(o.debts, { owed: 197500, repaidThisMonth: 1500, people: [{ id: asif.id, name: 'Asif', left: 197500 }] });
+  assert.equal(o.net, 7500); // received 9,000 − repaid 1,500
+  const oct = await A('GET', '/overview?month=2026-10&months=1');
+  assert.deepEqual([oct.debts.repaidThisMonth, oct.net], [1000, -1000]);
+});
+
 test('move-out: applied advance counts as received on settlement date; retained is shown apart, never as received', async () => {
   // Nov due (end 11-04, prorated 4/30 of 3000) = 400; unpaid 3000 + 400 = 3400 applied, 2000 retained, rest refunded
   await A('POST', `/agreements/${ids.g2}/move-out`, { endDate: '2026-11-04', lastMonthRule: 'PRORATED', applyAdvance: true,

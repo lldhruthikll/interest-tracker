@@ -77,18 +77,22 @@ async function suggestedCreditorId(tx, latestPayment) {
 
 const rupees = (t) => ({ borrowed: t.borrowedPaise / 100, repaid: t.repaidPaise / 100, left: t.leftPaise / 100, lastPaid: t.lastPaid });
 
-async function listCreditors(req, res) {
-  const rows = await req.db.creditor.findMany({ orderBy: { name: 'asc' },
+// Totals + one row per creditor (still owed first, then cleared). Shared by the Money I owe page and the Overview.
+async function debtSummary(db, month = periodOf(todayIST())) {
+  const rows = await db.creditor.findMany({ orderBy: { name: 'asc' },
     include: { entries: { select: { type: true, amount: true, date: true } } } });
-  const month = periodOf(todayIST());
   let owed = 0; let repaid = 0; let repaidThisMonth = 0;
   const creditors = rows.map(({ entries, ...c }) => {
     const t = totals(entries);
     owed += t.leftPaise; repaid += t.repaidPaise;
     for (const e of entries) if (e.type === 'REPAID' && periodOf(toDateOnly(e.date)) === month) repaidThisMonth += toPaise(e.amount);
     return { ...c, ...rupees(t) };
-  }).sort((a, b) => (a.left > 0 ? 0 : 1) - (b.left > 0 ? 0 : 1)); // still owed first, then cleared; name order kept
-  res.json({ totals: { owed: owed / 100, repaid: repaid / 100, repaidThisMonth: repaidThisMonth / 100 }, creditors });
+  }).sort((a, b) => (a.left > 0 ? 0 : 1) - (b.left > 0 ? 0 : 1)); // name order kept within each group
+  return { totals: { owed: owed / 100, repaid: repaid / 100, repaidThisMonth: repaidThisMonth / 100 }, creditors };
+}
+
+async function listCreditors(req, res) {
+  res.json(await debtSummary(req.db));
 }
 
 async function createCreditor(req, res) {
@@ -157,4 +161,4 @@ async function deleteEntry(req, res) {
 }
 
 module.exports = { listCreditors, createCreditor, getCreditor, updateCreditor, deleteCreditor, addEntry, deleteEntry,
-  linkRepayment, suggestedCreditorId };
+  linkRepayment, suggestedCreditorId, debtSummary };

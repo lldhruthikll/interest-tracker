@@ -94,7 +94,7 @@ export default function OverviewPage() {
   useEffect(() => { api.getOverview().then(setData).catch((e) => setError(e.message)); }, []);
   if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <Loading>Loading overview…</Loading>;
-  const { ledgers, totals, owedBack, trend, upcoming, overdueList } = data;
+  const { ledgers, totals, owedBack, trend, upcoming, overdueList, lentOut, debts, net } = data;
 
   return (
     <div className="space-y-6">
@@ -107,6 +107,9 @@ export default function OverviewPage() {
         <StatCard label="Owed back (not income)" value={formatINR(owedBack.advances + owedBack.credit)}
           note={`Advances ${formatINR(owedBack.advances)} · Credit ${formatINR(owedBack.credit)}`} tone="advance" />
         <StatCard label="Advance retained" value={formatINR(totals.advanceRetained)} note="Kept from advances this month" tone="neutral" />
+        <StatCard label="Money lent out" value={formatINR(lentOut)} note="Principal on active loans" tone="neutral" />
+        <StatCard label="I still owe" value={formatINR(debts.owed)} note={`Repaid ${formatINR(debts.repaidThisMonth)} this month`} tone="overdue" />
+        <StatCard label="Net this month" value={formatINR(net)} note="Received minus repaid to people I owe" tone={net < 0 ? 'overdue' : 'paid'} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -125,6 +128,18 @@ export default function OverviewPage() {
             </dl>
           </Link>
         ))}
+        <Link to="/owe" className="glass block rounded-xl3 p-5 hover:-translate-y-0.5">
+          <h2 className="mb-3 text-lg font-black">Money I owe</h2>
+          <dl className="grid grid-cols-2 gap-2 text-sm">
+            <div className="tone-overdue rounded-2xl px-3 py-2"><dt className="text-[11px] font-extrabold">Still owed</dt><dd className="font-black tabnum">{formatINR(debts.owed)}</dd></div>
+            <div className="tone-paid rounded-2xl px-3 py-2"><dt className="text-[11px] font-extrabold">Repaid this month</dt><dd className="font-black tabnum">{formatINR(debts.repaidThisMonth)}</dd></div>
+          </dl>
+          {debts.people.length > 0 && (
+            <ul className="mt-3 space-y-1 text-sm font-semibold">
+              {debts.people.map((p) => <li key={p.id} className="flex justify-between gap-3"><span className="truncate">{p.name}</span><span className="tabnum">{formatINR(p.left)} left</span></li>)}
+            </ul>
+          )}
+        </Link>
       </div>
 
       <Card>

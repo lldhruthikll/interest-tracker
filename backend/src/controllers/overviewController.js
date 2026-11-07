@@ -7,6 +7,7 @@ const { todayIST, istDate, addDays, addMonths, toDateOnly, toDbDate, periodOf, i
 const { buildSchedule } = require('../services/schedule');
 const { getDueDatesForLoan, syncAllActiveLoans } = require('../services/interestService');
 const { scheduleInput, syncOwner, agreementBalances } = require('../services/recurringSync');
+const { debtSummary } = require('./debtController');
 
 const istPeriod = (ts) => istDate(ts).slice(0, 7);
 const rupees = (paise) => paise / 100;
@@ -108,15 +109,23 @@ async function getOverview(req, res) {
       advances += b.advanceHeldPaise; credit += b.creditPaise;
     }
     const soon = (await dueItems(tx, cats, addDays(today, 1), addDays(today, 7), { activeOnly: true })).filter((i) => unpaid(i) > 0);
-    return { rows, advances, credit, received, ledgers, soon, owed };
+    const lent = await tx.loan.aggregate({ where: { status: 'ACTIVE' }, _sum: { principal: true } });
+    const debts = await debtSummary(tx, month);
+    return { rows, advances, credit, received, ledgers, soon, owed, lentOutPaise: toPaise(lent._sum.principal ?? 0), debts };
   }, { timeout: 30000 });
 
   const sum = (f) => out.rows.reduce((s, l) => s + f(l), 0);
+  const { totals: d, creditors } = out.debts;
   res.json({
     month,
     ledgers: out.rows.map((l) => ({ key: l.key, name: l.name, received: rupees(l.received), advanceRetained: rupees(l.advanceRetained), pending: rupees(l.pending), overdue: rupees(l.overdue) })),
     totals: { received: rupees(sum((l) => l.received)), advanceRetained: rupees(sum((l) => l.advanceRetained)), pending: rupees(sum((l) => l.pending)), overdue: rupees(sum((l) => l.overdue)) },
     owedBack: { advances: rupees(out.advances), credit: rupees(out.credit) },
+    lentOut: rupees(out.lentOutPaise),
+    // money I owe; net = received this month − repaid to people I owe this month
+    debts: { owed: d.owed, repaidThisMonth: d.repaidThisMonth,
+      people: creditors.filter((c) => c.left > 0).map((c) => ({ id: c.id, name: c.name, left: c.left })) },
+    net: rupees(sum((l) => l.received) - toPaise(d.repaidThisMonth)),
     trend: periods.map((period) => ({ period,
       byLedger: Object.fromEntries(out.ledgers.map((l) => [l.key, rupees(out.received[l.key][period])])) })),
     upcoming: out.soon.map((i) => listItem(i, unpaid(i))),
