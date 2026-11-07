@@ -122,10 +122,8 @@ async function getOverview(req, res) {
     totals: { received: rupees(sum((l) => l.received)), advanceRetained: rupees(sum((l) => l.advanceRetained)), pending: rupees(sum((l) => l.pending)), overdue: rupees(sum((l) => l.overdue)) },
     owedBack: { advances: rupees(out.advances), credit: rupees(out.credit) },
     lentOut: rupees(out.lentOutPaise),
-    // money I owe; net = received this month − repaid to people I owe this month
     debts: { owed: d.owed, repaidThisMonth: d.repaidThisMonth,
       people: creditors.filter((c) => c.left > 0).map((c) => ({ id: c.id, name: c.name, left: c.left })) },
-    net: rupees(sum((l) => l.received) - toPaise(d.repaidThisMonth)),
     trend: periods.map((period) => ({ period,
       byLedger: Object.fromEntries(out.ledgers.map((l) => [l.key, rupees(out.received[l.key][period])])) })),
     upcoming: out.soon.map((i) => listItem(i, unpaid(i))),
