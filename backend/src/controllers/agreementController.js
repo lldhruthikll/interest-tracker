@@ -6,6 +6,7 @@ const { todayIST, toDateOnly, toDbDate, isValidDateStr, periodOf, addMonths, cla
 const { requireOwned } = require('../lib/ownerDb');
 const { buildSchedule } = require('../services/schedule');
 const { lockAgreement, syncAgreement, reallocate, agreementBalances } = require('../services/recurringSync');
+const { suggestedCreditorId } = require('./debtController');
 
 const TIMINGS = ['IN_ADVANCE', 'IN_ARREARS'];
 const RULES = ['PRORATED', 'FULL', 'FREE'];
@@ -38,12 +39,14 @@ async function detail(tx, id) {
   const a = await tx.agreement.findUnique({ where: { id }, include: {
     unit: { include: { place: { include: { category: true } } } }, payer: true,
     rateChanges: { orderBy: { effectiveFrom: 'asc' } }, dues: { orderBy: { period: 'asc' } },
-    payments: { orderBy: [{ paymentDate: 'desc' }, { id: 'desc' }], include: { allocations: true } },
+    payments: { orderBy: [{ paymentDate: 'desc' }, { id: 'desc' }],
+      include: { allocations: true, debtEntry: { include: { creditor: { select: { id: true, name: true } } } } } },
     advances: { orderBy: { id: 'asc' } } } });
   const pastAgreements = await tx.agreement.findMany({ where: { unitId: a.unitId, id: { not: id } },
     orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
     select: { id: true, payer: { select: { id: true, name: true } }, startDate: true, endDate: true, status: true } });
-  return { ...a, balances: await agreementBalances(tx, id), pastAgreements };
+  return { ...a, balances: await agreementBalances(tx, id), pastAgreements,
+    suggestedCreditorId: await suggestedCreditorId(tx, a.payments[0]) };
 }
 
 // requireOwned (404), lock, then re-read so the status check sees the last committed writer.

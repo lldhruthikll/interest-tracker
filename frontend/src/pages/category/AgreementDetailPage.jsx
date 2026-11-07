@@ -85,6 +85,8 @@ export default function AgreementDetailPage() {
     { key: 'amount', header: 'Amount', align: 'right', render: (p) => formatINR(p.amount) },
     { key: 'method', header: 'Method', render: (p) => METHOD[p.method] || p.method },
     { key: 'notes', header: 'Notes', render: (p) => p.notes || '' },
+    { key: 'owe', header: 'Paid to', render: (p) => (p.debtEntry
+      ? <Link className="text-ink underline" to={`/owe/${p.debtEntry.creditor.id}`}>{p.debtEntry.creditor.name} ({formatINR(p.debtEntry.amount)})</Link> : '') },
     { key: 'act', header: '', render: (p) => (p.method === 'ADVANCE' || ended
       ? <span className="text-sm font-bold text-muted">Locked</span>
       : <span className="flex gap-2">
@@ -155,7 +157,8 @@ export default function AgreementDetailPage() {
         ]} rows={a.advances} empty="No advance recorded." />
       </Section>
 
-      {modal === 'pay' && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100} onClose={() => setModal(null)} onDone={done} />}
+      {modal === 'pay' && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100}
+        suggest={a.suggestedCreditorId} canRepay={!ended} onClose={() => setModal(null)} onDone={done} />}
       {modal?.edit && <RecurringPaymentModal open agreement={{ id: a.id, label }} payment={modal.edit} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'adv' && <AdvanceModal agreementId={a.id} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'rent' && <RentChangeModal open agreementId={a.id} current={currentRate?.amount} onClose={() => setModal(null)} onDone={done} />}

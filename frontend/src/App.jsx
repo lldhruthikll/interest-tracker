@@ -20,6 +20,8 @@ import PayersPage from './pages/payers/PayersPage';
 import PayerDetailPage from './pages/payers/PayerDetailPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import PortalPage from './pages/portal/PortalPage';
+import OwePage from './pages/owe/OwePage';
+import CreditorPage from './pages/owe/CreditorPage';
 
 const BorrowerRedirect = () => <Navigate to={`/lending/borrowers/${useParams().id}`} replace />;
 
@@ -61,6 +63,8 @@ export default function App() {
         <Route path="/c/:categoryId/manage" element={<ManagePlacesPage />} />
         <Route path="/c/:categoryId/settings" element={<CategorySettingsPage />} />
         <Route path="/agreements/:id" element={<AgreementDetailPage />} />
+        <Route path="/owe" element={<OwePage />} />
+        <Route path="/owe/:id" element={<CreditorPage />} />
         <Route path="/payers" element={<PayersPage />} />
         <Route path="/payers/:id" element={<PayerDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />

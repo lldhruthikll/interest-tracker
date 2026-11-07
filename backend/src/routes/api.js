@@ -15,6 +15,7 @@ const categoryController = require('../controllers/categoryController');
 const payerController = require('../controllers/payerController');
 const agreementController = require('../controllers/agreementController');
 const overviewController = require('../controllers/overviewController');
+const debtController = require('../controllers/debtController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -100,6 +101,15 @@ router.post('/agreements/:id/rates', wrap(agreementController.addRate));
 router.post('/agreements/:id/advance', wrap(agreementController.addAdvance));
 router.post('/agreements/:id/move-out/preview', wrap(agreementController.moveOutPreview));
 router.post('/agreements/:id/move-out', wrap(agreementController.moveOut));
+
+// Money I owe: creditors and their BORROWED / REPAID log
+router.get('/creditors', wrap(debtController.listCreditors));
+router.post('/creditors', wrap(debtController.createCreditor));
+router.get('/creditors/:id', wrap(debtController.getCreditor));
+router.put('/creditors/:id', wrap(debtController.updateCreditor));
+router.delete('/creditors/:id', wrap(debtController.deleteCreditor));
+router.post('/creditors/:id/entries', wrap(debtController.addEntry));
+router.delete('/debt-entries/:id', wrap(debtController.deleteEntry));
 
 // Reports
 router.get('/reports/excel', wrap(reportController.exportExcelReport));

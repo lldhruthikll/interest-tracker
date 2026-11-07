@@ -6,7 +6,7 @@ const { NotFound } = require('./errors');
 
 const OWNED_MODELS = ['Borrower', 'Loan', 'InterestRecord', 'Payment', 'PaymentAllocation',
   'Category', 'Place', 'Unit', 'Payer', 'Agreement', 'RateChange', 'RecurringDue', 'RecurringPayment',
-  'RecurringAllocation', 'AdvanceEntry'];
+  'RecurringAllocation', 'AdvanceEntry', 'Creditor', 'DebtEntry'];
 
 const WHERE_OPS = new Set([
   'findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate',

@@ -46,6 +46,7 @@ export default function AppShell() {
       <div className="px-3 pt-2.5 text-[10px] font-extrabold uppercase tracking-[.08em] text-muted">Ledgers</div>
       <NavLink to="/lending" className={item}>Lending</NavLink>
       {cats.map((c) => <NavLink key={c.id} to={`/c/${c.id}`} className={item}>{c.name}</NavLink>)}
+      <NavLink to="/owe" className={item}>Money I owe</NavLink>
       <button type="button" onClick={() => { setOpen(false); setNewCat(true); }} className="mt-1.5 rounded-2xl border border-dashed border-ink/40 px-3.5 py-2.5 text-center font-bold text-muted hover:text-ink">+ New category</button>
       <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
         <NavLink to="/payers" className={item}>Payers</NavLink>

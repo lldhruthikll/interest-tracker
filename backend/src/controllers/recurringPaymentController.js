@@ -4,6 +4,7 @@ const { HttpError, ValidationError, parseId } = require('../lib/errors');
 const { todayIST, toDateOnly, toDbDate, isValidDateStr } = require('../lib/dates');
 const { requireOwned } = require('../lib/ownerDb');
 const { lockAgreement, syncAgreement, agreementBalances } = require('../services/recurringSync');
+const { linkRepayment } = require('./debtController');
 
 const METHODS = ['CASH', 'UPI', 'BANK', 'CHEQUE']; // ADVANCE is created only by settlement
 
@@ -17,9 +18,9 @@ function validate(agreement, { amount, paymentDate, method, notes }) {
   return { amount: fromPaise(amountPaise), paymentDate: toDbDate(paymentDate), method, notes: notes || null };
 }
 
-async function finish(tx, agreementId, payment) {
+async function finish(tx, agreementId, payment, repayment = null) {
   await syncAgreement(tx, agreementId);
-  return { payment, balances: await agreementBalances(tx, agreementId) };
+  return { payment, repayment, balances: await agreementBalances(tx, agreementId) };
 }
 
 // requireOwned, then lock and re-read: status checks must not race a concurrent move-out.
@@ -39,11 +40,13 @@ async function requireEditable(tx, id) {
 }
 
 async function createPayment(req, res) {
-  const { agreementId, amount, paymentDate = todayIST(), method = 'CASH', notes } = req.body;
+  const { agreementId, amount, paymentDate = todayIST(), method = 'CASH', notes, repayTo } = req.body;
   const out = await req.db.$transaction(async (tx) => {
     const agreement = await lockedAgreement(tx, parseId(agreementId));
     const data = validate(agreement, { amount, paymentDate, method, notes });
     if (agreement.status === 'ENDED') {
+      // its payments can't be edited later, so a wrong link could never be fixed
+      if (repayTo) throw new ValidationError('Agreement has ended; this payment cannot be passed on to someone you owe');
       // no credit after settlement: there is no later step to refund it
       await syncAgreement(tx, agreement.id);
       if (toPaise(data.amount) > (await agreementBalances(tx, agreement.id)).unpaidPaise) {
@@ -51,7 +54,7 @@ async function createPayment(req, res) {
       }
     }
     const payment = await tx.recurringPayment.create({ data: { ...data, agreementId: agreement.id } });
-    return finish(tx, agreement.id, payment);
+    return finish(tx, agreement.id, payment, repayTo ? await linkRepayment(tx, payment, repayTo) : null);
   });
   res.status(201).json(out);
 }
@@ -68,7 +71,7 @@ async function updatePayment(req, res) {
       notes: pick('notes', old.notes),
     });
     const payment = await tx.recurringPayment.update({ where: { id }, data });
-    return finish(tx, agreement.id, payment);
+    return finish(tx, agreement.id, payment, await linkRepayment(tx, payment, req.body.repayTo));
   });
   res.json(out);
 }

@@ -49,6 +49,12 @@ export const api = {
   getProfile: () => apiFetch('/auth/profile'),
   changePassword: (data) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
+  getCreditors: () => apiFetch('/creditors'),
+  getCreditor: (id) => apiFetch(`/creditors/${id}`),
+  createCreditor: (d) => apiFetch('/creditors', { method: 'POST', body: JSON.stringify(d) }),
+  deleteCreditor: (id) => apiFetch(`/creditors/${id}`, { method: 'DELETE' }),
+  addDebtEntry: (id, d) => apiFetch(`/creditors/${id}/entries`, { method: 'POST', body: JSON.stringify(d) }),
+  deleteDebtEntry: (id) => apiFetch(`/debt-entries/${id}`, { method: 'DELETE' }),
   getCategories: () => apiFetch('/categories'),
   getAllCategories: () => apiFetch('/categories?all=1'),
   getCategory: (id) => apiFetch(`/categories/${id}`),
