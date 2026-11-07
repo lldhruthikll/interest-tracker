@@ -72,7 +72,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
         <ErrorNote>{error || (unitMissing ? 'The selected unit is not vacant, so no one can be moved in. Close this and try again.' : '')}</ErrorNote>
         {units.length === 0 ? <p className="font-bold text-muted">No vacant {cat.unitLabel.toLowerCase()} available. Add one under Manage.</p> : (
           <Select label={cat.unitLabel} value={f.unitId} onChange={pickUnit}>
-            {units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.placeName}</option>)}
+            {units.map((u) => <option key={u.id} value={u.id}>{u.name}{cat.placeLabel && ` · ${u.placeName}`}</option>)}
           </Select>
         )}
         <div className="glass-in space-y-3 rounded-2xl p-4">

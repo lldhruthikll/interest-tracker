@@ -133,7 +133,7 @@ async function exportCategory(req, res) {
     return { category, agreements };
   }, { timeout: 30000 });
 
-  const who = (a) => ({ [category.placeLabel]: a.unit.place.name, [category.unitLabel]: a.unit.name, [category.payerLabel]: a.payer.name });
+  const who = (a) => ({ ...(category.placeLabel && { [category.placeLabel]: a.unit.place.name }), [category.unitLabel]: a.unit.name, [category.payerLabel]: a.payer.name });
   const rows = (f) => agreements.flatMap((a) => f(a).map((r) => ({ ...who(a), ...r })));
   const sheets = {
     Dues: rows((a) => a.dues.map((d) => ({ Period: d.period, 'Due Date': toDateOnly(d.dueDate), Amount: Number(d.amount),

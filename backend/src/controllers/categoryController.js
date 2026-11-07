@@ -7,7 +7,8 @@ const { parseAmountPaise, fromPaise, toPaise } = require('../lib/money');
 const { requireOwned } = require('../lib/ownerDb');
 const { syncAgreement, unitStatus, currentRate, agreementBalances, scheduleInput } = require('../services/recurringSync');
 
-const CATEGORY = { name: 'text', placeLabel: 'text', unitLabel: 'text', payerLabel: 'text', color: 'opt', archived: 'bool' };
+// placeLabel '' = 2-level category (no top level): its units live in one hidden place the UI never shows.
+const CATEGORY = { name: 'text', placeLabel: 'opt', unitLabel: 'text', payerLabel: 'text', color: 'opt', archived: 'bool' };
 const PLACE = { name: 'text', address: 'opt', archived: 'bool' };
 const UNIT = { name: 'text', notes: 'opt', archived: 'bool' };
 
@@ -22,8 +23,14 @@ async function listCategories(req, res) {
   res.json(await req.db.category.findMany({ where, orderBy: { id: 'asc' } }));
 }
 
+function categoryData(body, partial) {
+  const data = fields(body, CATEGORY, partial);
+  if (!partial || 'placeLabel' in data) data.placeLabel = data.placeLabel ?? '';
+  return data;
+}
+
 async function createCategory(req, res) {
-  res.status(201).json(await req.db.category.create({ data: fields(req.body, CATEGORY) }));
+  res.status(201).json(await req.db.category.create({ data: categoryData(req.body, false) }));
 }
 
 // Places → units, each unit with its active agreement (+ payer, rates) and dashboard status.
@@ -115,10 +122,14 @@ async function refuseArchiveWithActive(tx, data, label, unitWhere) {
 
 async function updateCategory(req, res) {
   const id = parseId(req.params.id);
-  const data = fields(req.body, CATEGORY, true);
+  const data = categoryData(req.body, true);
   res.json(await req.db.$transaction(async (tx) => {
     await requireOwned(tx, 'category', id);
     await refuseArchiveWithActive(tx, data, 'Category', { place: { categoryId: id } });
+    // 2 levels shows one place only; units in a second active place would vanish from the screens
+    if (data.placeLabel === '' && await tx.place.count({ where: { categoryId: id, archived: false } }) > 1) {
+      throw new HttpError(409, 'Category has more than one active top-level group; archive the extras first');
+    }
     return tx.category.update({ where: { id }, data });
   }));
 }

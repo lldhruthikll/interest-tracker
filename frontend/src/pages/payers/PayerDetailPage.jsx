@@ -83,7 +83,7 @@ export default function PayerDetailPage() {
 
   const cols = [
     { key: 'unit', header: 'Unit', render: (a) => <Link className="font-extrabold text-ink underline" to={`/agreements/${a.id}`}>{a.unit.name}</Link> },
-    { key: 'place', header: 'Place', render: (a) => `${a.unit.place.category.name} · ${a.unit.place.name}` },
+    { key: 'place', header: 'Place', render: (a) => [a.unit.place.category.name, a.unit.place.category.placeLabel && a.unit.place.name].filter(Boolean).join(' · ') },
     { key: 'status', header: 'Status', render: (a) => <StatusPill status={a.status} /> },
     { key: 'since', header: 'Since', render: (a) => formatDate(String(a.startDate).slice(0, 10)) },
     { key: 'unpaid', header: 'Unpaid', align: 'right', render: (a) => formatINR(a.balances.unpaidPaise / 100) },

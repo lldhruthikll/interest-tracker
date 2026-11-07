@@ -19,7 +19,7 @@ function AgreementCard({ a, today }) {
     <Card className="space-y-4">
       <div>
         <h2 className="text-xl font-black">{a.unitName}</h2>
-        <p className="font-semibold text-muted">{a.categoryName} · {a.placeName}{a.status === 'ENDED' ? ` · Ended ${formatDate(a.endDate)}` : ''}</p>
+        <p className="font-semibold text-muted">{a.categoryName}{a.placeName && ` · ${a.placeName}`}{a.status === 'ENDED' ? ` · Ended ${formatDate(a.endDate)}` : ''}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="Monthly amount" value={formatINR(a.amount)} note={`Due on day ${a.dueDay}`} />

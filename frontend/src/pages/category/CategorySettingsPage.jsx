@@ -40,14 +40,15 @@ export default function CategorySettingsPage() {
   return (
     <div className="max-w-xl space-y-6">
       <PageHeader title={`${cat.name} settings`} sub={cat.archived ? 'Archived' : undefined}>
-        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {cat.placeLabel}</Link>
+        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {cat.placeLabel || cat.unitLabel}</Link>
       </PageHeader>
       <ErrorNote>{error}</ErrorNote>
       {ok && <p role="status" className="glass rounded-2xl px-4 py-3 text-sm font-bold">{ok}</p>}
       <Card>
         <form onSubmit={save} className="space-y-4">
           <Field label="Category name" required value={f.name} onChange={set('name')} />
-          <Field label="Top level label (singular)" required value={f.placeLabel} onChange={set('placeLabel')} />
+          <Field label="Top level label (singular, optional)" value={f.placeLabel} onChange={set('placeLabel')} />
+          <p className="text-sm font-semibold text-muted">Blank = 2 levels. Clearing it needs at most one active top-level group.</p>
           <Field label="Rented item label (singular)" required value={f.unitLabel} onChange={set('unitLabel')} />
           <Field label="Payer label (singular)" required value={f.payerLabel} onChange={set('payerLabel')} />
           <Field label="Color" type="color" className="max-w-[8rem]" value={f.color} onChange={set('color')} />
@@ -56,7 +57,7 @@ export default function CategorySettingsPage() {
       </Card>
       <Card className="space-y-3">
         <h2 className="text-lg font-black">Archive or delete</h2>
-        <p className="text-sm font-semibold text-muted">Archiving hides the category from the sidebar and the Overview; data is kept. Delete works only for a category with no {cat.placeLabel.toLowerCase()} added.</p>
+        <p className="text-sm font-semibold text-muted">Archiving hides the category from the sidebar and the Overview; data is kept. Delete works only for a category with nothing added under it.</p>
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" onClick={toggleArchive}>{cat.archived ? 'Restore category' : 'Archive category'}</Button>
           <Button variant="secondary" onClick={remove}>Delete category</Button>

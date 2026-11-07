@@ -45,35 +45,47 @@ export default function ManagePlacesPage() {
   if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
   if (!cat) return <Loading />;
   const labels = { place: cat.placeLabel, unit: cat.unitLabel };
+  // 2-level category: units live in one hidden place, created with the first unit
+  const flat = !cat.placeLabel;
+  const hidden = flat ? cat.places.find((p) => !p.archived) : null;
+  const places = flat ? (hidden ? [hidden] : []) : cat.places;
 
   const act = async (fn) => { setError(''); try { await fn(); await reload(); } catch (err) { setError(err.message); } };
   const save = async (data) => {
     const { kind, item, placeId } = edit;
     if (kind === 'place') await (item ? api.updatePlace(item.id, data) : api.createPlace(cat.id, data));
-    else await (item ? api.updateUnit(item.id, data) : api.createUnit(placeId, data));
+    else if (item) await api.updateUnit(item.id, data);
+    else {
+      let pid = placeId ?? hidden?.id;
+      // reload right away so a failed unit save retries into this place, not a second hidden one
+      if (!pid) { pid = (await api.createPlace(cat.id, { name: cat.name })).id; await reload(); }
+      await api.createUnit(pid, data);
+    }
     setEdit(null);
     await reload();
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`Manage ${cat.placeLabel} and ${cat.unitLabel}`} sub={cat.name}>
+      <PageHeader title={flat ? `Manage ${cat.unitLabel}` : `Manage ${cat.placeLabel} and ${cat.unitLabel}`} sub={cat.name}>
         <Link className="btn" to={`/c/${cat.id}`}>Back</Link>
         <Link className="btn" to={`/c/${cat.id}/settings`}>Settings</Link>
-        <Button onClick={() => setEdit({ kind: 'place' })}>+ Add {cat.placeLabel.toLowerCase()}</Button>
+        {flat
+          ? <Button onClick={() => setEdit({ kind: 'unit', placeId: hidden?.id })}>+ Add {cat.unitLabel.toLowerCase()}</Button>
+          : <Button onClick={() => setEdit({ kind: 'place' })}>+ Add {cat.placeLabel.toLowerCase()}</Button>}
       </PageHeader>
       <ErrorNote>{error}</ErrorNote>
-      {cat.places.length === 0 && <Card><p className="py-6 text-center font-bold text-muted">No {cat.placeLabel.toLowerCase()} yet. Add the first one.</p></Card>}
-      {cat.places.map((p) => (
+      {places.length === 0 && <Card><p className="py-6 text-center font-bold text-muted">No {(cat.placeLabel || cat.unitLabel).toLowerCase()} yet. Add the first one.</p></Card>}
+      {places.map((p) => (
         <Card key={p.id} className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          {!flat && <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-black">{p.name} {p.archived && <StatusPill status="Archived" />}</h2>
             <div className="flex flex-wrap gap-2">
               <Button className="!px-3 !py-1.5 text-sm" onClick={() => setEdit({ kind: 'place', item: p })}>Edit</Button>
               <Button className="!px-3 !py-1.5 text-sm" onClick={() => act(() => api.updatePlace(p.id, { archived: !p.archived }))}>{p.archived ? 'Restore' : 'Archive'}</Button>
               {!p.archived && <Button className="!px-3 !py-1.5 text-sm" onClick={() => setEdit({ kind: 'unit', placeId: p.id })}>+ Add {cat.unitLabel.toLowerCase()}</Button>}
             </div>
-          </div>
+          </div>}
           {p.units.length === 0 ? <p className="font-semibold text-muted">No {cat.unitLabel.toLowerCase()} yet.</p> : (
             <ul className="space-y-2">
               {p.units.map((u) => (

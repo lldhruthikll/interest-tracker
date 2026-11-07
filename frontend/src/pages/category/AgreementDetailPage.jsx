@@ -95,7 +95,7 @@ export default function AgreementDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`${a.unit.name} · ${a.payer.name}`} sub={`${cat.name} · ${cat.placeLabel}: ${a.unit.place.name}${ended ? ` · Ended ${formatAnyDate(a.endDate)}` : ''}`}>
+      <PageHeader title={`${a.unit.name} · ${a.payer.name}`} sub={`${cat.name}${cat.placeLabel ? ` · ${cat.placeLabel}: ${a.unit.place.name}` : ''}${ended ? ` · Ended ${formatAnyDate(a.endDate)}` : ''}`}>
         <Link className="btn" to={`/c/${cat.id}`}>Back</Link>
         {(!ended || b.unpaidPaise > 0) && <Button onClick={() => setModal('pay')}>+ Record payment</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('rent')}>Change rent</Button>}
@@ -114,7 +114,7 @@ export default function AgreementDetailPage() {
       <Section title="Agreement">
         <dl>
           <Row k={cat.payerLabel} v={`${a.payer.name} · ${a.payer.phone}`} />
-          <Row k={cat.unitLabel} v={`${a.unit.name} (${cat.placeLabel}: ${a.unit.place.name})`} />
+          <Row k={cat.unitLabel} v={cat.placeLabel ? `${a.unit.name} (${cat.placeLabel}: ${a.unit.place.name})` : a.unit.name} />
           <Row k="Category" v={cat.name} />
           <Row k="Current amount" v={formatINR(currentRate?.amount)} />
           <Row k="Due day" v={a.dueDay} />

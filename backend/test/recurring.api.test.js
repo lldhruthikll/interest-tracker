@@ -84,6 +84,22 @@ test('categories, places, units: tree with labels, archive, delete guard, valida
   assert.equal(await unitStatus(ids.u1), 'UPCOMING'); // no dues yet
 });
 
+test('2-level category: blank top level stored as empty, export works, guarded when switching', async () => {
+  const flat = await ok('POST', '/categories', { name: 'Parking', unitLabel: 'Vehicle pass', payerLabel: 'Regular' }, 201);
+  assert.equal(flat.placeLabel, '');
+  const lot = await ok('POST', `/categories/${flat.id}/places`, { name: 'Parking' }, 201);
+  const pass = await ok('POST', `/places/${lot.id}/units`, { name: 'Car #1', defaultAmount: 1500 }, 201);
+  await moveIn(pass.id);
+  const xlsx = await call('GET', `/categories/${flat.id}/export`);
+  assert.equal(xlsx.status, 200);
+
+  // 3 → 2 needs at most one active place; archiving the extra makes it allowed; 2 → 3 just sets a label
+  assert.equal(await status('PUT', `/categories/${ids.cat}`, { placeLabel: '' }), 409);
+  await ok('PUT', `/places/${ids.pb}`, { archived: true });
+  assert.equal((await ok('PUT', `/categories/${ids.cat}`, { placeLabel: ' ' })).placeLabel, '');
+  assert.equal((await ok('PUT', `/categories/${flat.id}`, { placeLabel: 'Lot' })).placeLabel, 'Lot');
+});
+
 test('preview, move-in with advance, one active agreement per unit, payers and logins', async () => {
   const pv = { startDate: '2026-03-25', dueDay: 5, timing: 'IN_ADVANCE', firstMonthRule: 'PRORATED', amount: 31000 };
   assert.deepEqual(await ok('POST', '/agreements/preview', pv), [

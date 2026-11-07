@@ -21,7 +21,7 @@ async function me(req, res) {
       const b = await agreementBalances(tx, a.id);
       const cat = a.unit.place.category;
       out.push({
-        categoryName: cat.name, placeName: a.unit.place.name, unitName: a.unit.name,
+        categoryName: cat.name, placeName: cat.placeLabel ? a.unit.place.name : null, unitName: a.unit.name,
         labels: { place: cat.placeLabel, unit: cat.unitLabel, payer: cat.payerLabel },
         amount: currentRate(a.rateChanges), dueDay: a.dueDay, status: a.status,
         startDate: toDateOnly(a.startDate), endDate: a.endDate ? toDateOnly(a.endDate) : null,

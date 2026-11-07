@@ -23,8 +23,8 @@ export default function NewCategoryModal({ open, onClose, onCreated }) {
       <form onSubmit={submit} className="space-y-4">
         <ErrorNote>{error}</ErrorNote>
         <Field label="Category name" required placeholder="e.g. Commercial Rent" value={f.name} onChange={set('name')} />
-        <p className="text-sm font-semibold text-muted">Names for the three levels, singular. Example: Building, Shop, Tenant.</p>
-        <Field label="Top level (e.g. Building)" required value={f.placeLabel} onChange={set('placeLabel')} />
+        <p className="text-sm font-semibold text-muted">Names for the levels, singular. Example: Building, Shop, Tenant. Leave the top level blank if you have only one (2 levels: Shop, Tenant).</p>
+        <Field label="Top level, optional (e.g. Building)" value={f.placeLabel} onChange={set('placeLabel')} />
         <Field label="Item that is rented (e.g. Shop)" required value={f.unitLabel} onChange={set('unitLabel')} />
         <Field label="Who pays (e.g. Tenant)" required value={f.payerLabel} onChange={set('payerLabel')} />
         <Field label="Color" type="color" className="max-w-[8rem]" value={f.color} onChange={set('color')} />

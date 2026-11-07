@@ -42,7 +42,7 @@ export default function CategoryDashboardPage() {
     { key: 'unitName', header: L.unit, render: (u) => (u.agreementId
       ? <Link className="font-extrabold text-ink underline" to={`/agreements/${u.agreementId}`}>{u.unitName}</Link>
       : <button type="button" className="font-extrabold text-ink underline" onClick={() => setMoveIn({ unitId: u.unitId })}>{u.unitName}</button>) },
-    { key: 'placeName', header: L.place },
+    ...(L.place ? [{ key: 'placeName', header: L.place }] : []),
     { key: 'payer', header: L.payer, render: (u) => u.payer?.name || '—' },
     { key: 'amount', header: 'Amount', align: 'right', render: (u) => formatINR(u.amount) },
     { key: 'status', header: 'Status', render: (u) => <StatusPill status={u.status} /> },
@@ -50,8 +50,8 @@ export default function CategoryDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={cat.name} sub={`${L.place} → ${L.unit} → ${L.payer}`}>
-        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {L.place}</Link>
+      <PageHeader title={cat.name} sub={[L.place, L.unit, L.payer].filter(Boolean).join(' → ')}>
+        <Link className="btn" to={`/c/${cat.id}/manage`}>Manage {L.place || L.unit}</Link>
         <Link className="btn" to={`/c/${cat.id}/settings`}>Settings</Link>
         <Button onClick={exportXlsx}>Export</Button>
         <Button disabled={!activeUnits.length} onClick={() => setPaying(true)}>+ Record payment</Button>
@@ -59,7 +59,7 @@ export default function CategoryDashboardPage() {
 
       <ErrorNote>{actionError}</ErrorNote>
 
-      {data.places.length > 0 && (
+      {L.place && data.places.length > 0 && (
         <Chips value={placeId} onChange={setPlaceId}
           options={[{ value: '', label: `All ${plural(L.place.toLowerCase())}` }, ...data.places.map((p) => ({ value: String(p.id), label: p.name }))]} />
       )}
