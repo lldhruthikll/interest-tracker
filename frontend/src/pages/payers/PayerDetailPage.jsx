@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Button, Card, StatusPill, Table, Field, Loading, ErrorNote, PageHeader } from '../../components/ui';
+import { Button, Card, StatusPill, Table, Field, Loading, ErrorNote, PageHeader, SmsToggle } from '../../components/ui';
 import { formatINR, formatDate } from '../../lib/format';
 
 function EditPayerCard({ payer, reload }) {
@@ -94,6 +94,8 @@ export default function PayerDetailPage() {
       <PageHeader title={p.name} sub={[p.phone, p.notes].filter(Boolean).join(' · ')}>
         <Link className="btn" to="/payers">Back</Link>
       </PageHeader>
+      <SmsToggle key={p.id} checked={p.smsReminders} label={`Send SMS due-date reminders to ${p.name}`}
+        onSave={(v) => api.updatePayer(p.id, { smsReminders: v })} />
       <Table columns={cols} rows={p.agreements} empty="No agreements yet." />
       <EditPayerCard key={`${p.name}|${p.phone}|${p.notes}`} payer={p} reload={load} />
       <LoginCard payer={p} reload={load} />

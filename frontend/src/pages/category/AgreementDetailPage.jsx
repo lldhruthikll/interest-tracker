@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Button, Card, Modal, Field, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
+import { Button, Card, Modal, Field, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader, SmsToggle } from '../../components/ui';
 import { formatINR, formatDate, formatAnyDate, periodLabel, todayIST } from '../../lib/format';
 import RecurringPaymentModal from './modals/RecurringPaymentModal';
 import RentChangeModal from './modals/RentChangeModal';
@@ -127,6 +127,8 @@ export default function AgreementDetailPage() {
           {ended && <Row k="End date" v={formatAnyDate(a.endDate)} />}
           {a.notes && <Row k="Notes" v={a.notes} />}
         </dl>
+        <SmsToggle key={a.payer.id} checked={a.payer.smsReminders} label={`Send SMS reminders to ${a.payer.name}`}
+          onSave={(v) => api.updatePayer(a.payer.id, { smsReminders: v })} />
       </Section>
 
       <Section title="Monthly dues"><Table columns={duesCols} rows={a.dues} empty="No dues yet." /></Section>

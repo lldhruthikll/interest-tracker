@@ -107,6 +107,24 @@ test('lending: borrowers with interest due today get a text with total pending; 
   assert.ok(again.skipped.some((s) => s.loanId === loan.id && s.reason === 'phone number not usable'));
 });
 
+test('per-person switch: an unticked tenant or borrower is skipped and reported, others still get texts', async () => {
+  const ok = as(ta);
+  const ramesh = await ok('POST', '/borrowers', { name: 'Ramesh', phone: '9988776655' }, 201);
+  const loan = await ok('POST', '/loans', { borrowerId: ramesh.id, principal: 100000, monthlyInterest: 2000, startDate: '2026-09-05' }, 201);
+  const ravi = (await ok('GET', `/agreements/${ids['A-1']}`)).payer;
+  assert.equal(ravi.smsReminders, true); // on by default
+
+  assert.equal((await ok('PUT', `/payers/${ravi.id}`, { smsReminders: false })).smsReminders, false);
+  assert.equal((await ok('PUT', `/borrowers/${ramesh.id}`, { smsReminders: false })).smsReminders, false);
+  await ok('PUT', `/borrowers/${ramesh.id}`, { smsReminders: 'no' }, 400);
+  await ok('PUT', `/payers/${ravi.id}`, { smsReminders: 'no' }, 400);
+
+  const out = await job();
+  assert.deepEqual(calls.map((c) => c.text.split(',')[0]), ['Hi Sita']);
+  assert.deepEqual(out.skipped.filter((s) => s.reason === 'reminders turned off for this person'),
+    [{ agreementId: ids['A-1'], reason: 'reminders turned off for this person' }, { loanId: loan.id, reason: 'reminders turned off for this person' }]);
+});
+
 test('job key required; 503 when the gateway is not configured; a send error is reported, not thrown', async () => {
   await job(null, 401);
   await job('wrong-key!', 401);

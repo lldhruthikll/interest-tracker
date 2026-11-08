@@ -192,7 +192,8 @@ async function createBorrower(req, res) {
 
 async function updateBorrower(req, res) {
   const id = parseId(req.params.id);
-  const { name, phone, address, notes } = req.body;
+  const { name, phone, address, notes, smsReminders } = req.body;
+  if (smsReminders !== undefined && typeof smsReminders !== 'boolean') throw new ValidationError('smsReminders must be true or false');
 
   // Not owned -> P2025 -> 404
   const updated = await req.db.borrower.update({
@@ -202,6 +203,7 @@ async function updateBorrower(req, res) {
       ...(phone && { phone }),
       ...(address !== undefined && { address }),
       ...(notes !== undefined && { notes }),
+      ...(smsReminders !== undefined && { smsReminders }),
     },
   });
 

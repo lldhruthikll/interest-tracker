@@ -1,8 +1,26 @@
-import React, { useEffect, useRef, useId } from 'react';
+import React, { useEffect, useRef, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown } from 'lucide-react';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
+
+// Per-person SMS reminder tick box (tenant/regular or borrower). Saves on change; rolls back if the save fails.
+export function SmsToggle({ checked, onSave, label = 'Send SMS reminders' }) {
+  const [on, setOn] = useState(!!checked);
+  const [error, setError] = useState('');
+  const change = async (e) => {
+    const next = e.target.checked;
+    setOn(next); setError('');
+    try { await onSave(next); } catch (err) { setOn(!next); setError(err.message); }
+  };
+  return (
+    <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+      <input type="checkbox" className="h-4 w-4 accent-current" checked={on} onChange={change} />
+      {label}
+      {error && <span role="alert" className="font-bold text-ink">· {error}</span>}
+    </label>
+  );
+}
 
 export function Button({ variant = 'primary', className, ...p }) {
   return <button type="button" className={cx(variant === 'primary' ? 'btn-primary' : 'btn', className)} {...p} />;

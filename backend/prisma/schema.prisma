@@ -41,17 +41,18 @@ model User {
 }
 
 model Borrower {
-  id        Int       @id @default(autoincrement())
-  ownerId   Int
-  owner     User      @relation(fields: [ownerId], references: [id])
-  name      String
-  phone     String
-  address   String?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  loans     Loan[]
-  payments  Payment[]
+  id           Int       @id @default(autoincrement())
+  ownerId      Int
+  owner        User      @relation(fields: [ownerId], references: [id])
+  name         String
+  phone        String
+  address      String?
+  notes        String?
+  smsReminders Boolean   @default(true) // due-date SMS to this borrower (account switch must also be on)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  loans        Loan[]
+  payments     Payment[]
 
   @@index([ownerId])
 }
@@ -174,15 +175,16 @@ model Unit {
 }
 
 model Payer {
-  id         Int         @id @default(autoincrement())
-  ownerId    Int
-  owner      User        @relation("PayerOwner", fields: [ownerId], references: [id])
-  name       String
-  phone      String
-  notes      String?
-  user       User?       @relation("PayerLogin")
-  agreements Agreement[]
-  createdAt  DateTime    @default(now())
+  id           Int         @id @default(autoincrement())
+  ownerId      Int
+  owner        User        @relation("PayerOwner", fields: [ownerId], references: [id])
+  name         String
+  phone        String
+  notes        String?
+  smsReminders Boolean     @default(true) // due-date SMS to this tenant/regular (account switch must also be on)
+  user         User?       @relation("PayerLogin")
+  agreements   Agreement[]
+  createdAt    DateTime    @default(now())
 
   @@index([ownerId])
 }

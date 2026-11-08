@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Plus, IndianRupee, Pencil, Trash2, Square, CheckSquare } from 'lucide-react';
 import { api } from '../../api/client';
-import { Button, Card, StatCard, StatusPill, Table, EmptyState, Loading, ErrorNote } from '../../components/ui';
+import { Button, Card, StatCard, StatusPill, Table, EmptyState, Loading, ErrorNote, SmsToggle } from '../../components/ui';
 import LoanFormModal from '../../components/LoanFormModal';
 import PaymentModal from '../../components/PaymentModal';
 import BorrowerFormModal from '../../components/BorrowerFormModal';
@@ -119,6 +119,10 @@ export default function BorrowerDetailPage() {
             </h1>
             <p className="mt-1 font-semibold text-muted">{borrower.phone}{borrower.address ? ` • ${borrower.address}` : ''}</p>
             {borrower.notes && <p className="glass-in mt-2 inline-block rounded-xl px-3 py-1.5 text-sm font-semibold text-muted">Notes: {borrower.notes}</p>}
+            <div className="mt-2">
+              <SmsToggle key={borrower.id} checked={borrower.smsReminders} label="Send SMS interest reminders"
+                onSave={(v) => api.updateBorrower(borrower.id, { smsReminders: v })} />
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
             <Button variant="secondary" onClick={() => { setLoanToEdit(null); setIsLoanModalOpen(true); }}><Plus size={16} /> Add New Loan</Button>

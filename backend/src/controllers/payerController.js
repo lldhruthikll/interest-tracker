@@ -5,7 +5,7 @@ const { requireOwned } = require('../lib/ownerDb');
 const { syncAgreement, agreementBalances } = require('../services/recurringSync');
 const { minPw } = require('./adminController');
 
-const PAYER = { name: 'text', phone: 'text', notes: 'opt' };
+const PAYER = { name: 'text', phone: 'text', notes: 'opt', smsReminders: 'bool' };
 const LOGIN = { select: { username: true, active: true } };
 const withLogin = ({ user, ...p }) => ({ ...p, login: user || null });
 

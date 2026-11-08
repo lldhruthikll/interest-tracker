@@ -75,6 +75,7 @@ async function dueToday(ownerId, today) {
       if (duePaise <= 0) continue;
       const { unpaidPaise } = await agreementBalances(tx, d.agreementId);
       const { payer, unit } = d.agreement;
+      if (!payer.smsReminders) { out.push({ ref: { agreementId: d.agreementId }, off: true }); continue; }
       out.push({ id: `rent-${d.id}`, ref: { agreementId: d.agreementId }, phone: payer.phone,
         text: reminderText({ payerName: payer.name, unitName: unit.name, categoryName: unit.place.category.name,
           period: d.period, duePaise, unpaidPaise }) });
@@ -87,6 +88,7 @@ async function dueToday(ownerId, today) {
       // everything this borrower owes up to today, across their active loans
       const owed = await tx.interestRecord.findMany({ where: { dueDate: { lte: toDbDate(today) },
         loan: { status: 'ACTIVE', borrowerId: r.loan.borrowerId } }, select: { amount: true, paidAmount: true } });
+      if (!r.loan.borrower.smsReminders) { out.push({ ref: { loanId: r.loanId }, off: true }); continue; }
       const pendingPaise = owed.reduce((sum, o) => sum + toPaise(o.amount) - toPaise(o.paidAmount), 0);
       out.push({ id: `loan-${r.id}`, ref: { loanId: r.loanId }, phone: r.loan.borrower.phone,
         text: lendingText({ borrowerName: r.loan.borrower.name, period: toDateOnly(r.dueDate).slice(0, 7), duePaise, pendingPaise }) });
@@ -106,6 +108,7 @@ async function rentReminders(req, res) {
     select: { id: true }, orderBy: { id: 'asc' } });
   for (const { id: ownerId } of owners) {
     for (const r of await dueToday(ownerId, today)) {
+      if (r.off) { out.skipped.push({ ...r.ref, reason: 'reminders turned off for this person' }); continue; }
       const to = normalizePhone(r.phone);
       if (!to) { out.skipped.push({ ...r.ref, reason: 'phone number not usable' }); continue; }
       try {
