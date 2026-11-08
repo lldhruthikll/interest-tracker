@@ -8,12 +8,13 @@ const METHODS = [['CASH', 'Cash'], ['UPI', 'UPI'], ['BANK', 'Bank'], ['CHEQUE', 
 // agreements: [{id, label, unpaid?}] to pick from; or pass fixed `agreement` {id,label}. `payment` = edit mode.
 // suggest: creditor id to pre-select for "paid to someone you owe" (else fetched with the agreement).
 // canRepay=false hides that question (ended agreements: their payments can't be edited later).
-export default function RecurringPaymentModal({ open, agreements = [], agreement, payment, unpaid, suggest, canRepay = true, onClose, onDone }) {
+// defaultAmount/note pre-fill a new payment ("Mark paid" on a month).
+export default function RecurringPaymentModal({ open, agreements = [], agreement, payment, unpaid, suggest, canRepay = true, defaultAmount, note, onClose, onDone }) {
   const [agId, setAgId] = useState(String(agreement?.id ?? agreements[0]?.id ?? ''));
   const [q, setQ] = useState('');
   const [f, setF] = useState({
-    amount: payment?.amount ?? '', paymentDate: payment ? String(payment.paymentDate).slice(0, 10) : todayIST(),
-    method: payment?.method ?? 'CASH', notes: payment?.notes ?? '' });
+    amount: payment?.amount ?? defaultAmount ?? '', paymentDate: payment ? String(payment.paymentDate).slice(0, 10) : todayIST(),
+    method: payment?.method ?? 'CASH', notes: payment?.notes ?? note ?? '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });

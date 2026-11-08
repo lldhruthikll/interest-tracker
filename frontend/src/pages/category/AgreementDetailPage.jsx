@@ -118,6 +118,9 @@ export default function AgreementDetailPage() {
   const done = () => { setModal(null); load(); };
   const label = `${a.unit.name} · ${a.payer.name}`;
   const prev = a.dues.find((d) => d.period === '0000-00');
+  // Payments always clear the oldest unpaid month first, so "Mark paid" sits only on that month.
+  const left = (d) => Math.round((d.amount - d.paidAmount) * 100) / 100;
+  const oldestUnpaid = a.dues.find((d) => left(d) > 0);
 
   const del = async (p) => {
     if (!window.confirm('Delete this payment? This cannot be undone.')) return;
@@ -130,7 +133,13 @@ export default function AgreementDetailPage() {
     { key: 'dueDate', header: 'Due date', render: (d) => formatDate(String(d.dueDate).slice(0, 10)) },
     { key: 'amount', header: 'Amount', align: 'right', render: (d) => formatINR(d.amount) },
     { key: 'paid', header: 'Paid', align: 'right', render: (d) => formatINR(d.paidAmount) },
-    { key: 'status', header: 'Status', render: (d) => <StatusPill status={dueStatus(d, today)} /> },
+    { key: 'status', header: 'Status', render: (d) => (
+      <span className="flex items-center gap-2">
+        <StatusPill status={dueStatus(d, today)} />
+        {d === oldestUnpaid && <button type="button" onClick={() => setModal({ pay: d })} className="text-sm font-extrabold text-ink underline"
+          aria-label={`Mark ${periodLabel(d.period)} as paid`}>Mark paid</button>}
+      </span>
+    ) },
   ];
   const payCols = [
     { key: 'date', header: 'Date', render: (p) => formatAnyDate(p.paymentDate) },
@@ -214,7 +223,8 @@ export default function AgreementDetailPage() {
         ]} rows={a.advances} empty="No advance recorded." />
       </Section>
 
-      {modal === 'pay' && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100}
+      {(modal === 'pay' || modal?.pay) && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100}
+        defaultAmount={modal?.pay && left(modal.pay)} note={modal?.pay && `${periodLabel(modal.pay.period)} paid`}
         suggest={a.suggestedCreditorId} canRepay={!ended} onClose={() => setModal(null)} onDone={done} />}
       {modal?.edit && <RecurringPaymentModal open agreement={{ id: a.id, label }} payment={modal.edit} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'tenant' && <TenantModal payer={a.payer} label={cat.payerLabel} onClose={() => setModal(null)} onDone={done} />}
