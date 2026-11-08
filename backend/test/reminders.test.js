@@ -64,7 +64,7 @@ test('texts tenants due today with what they owe; skips paid, later, unusable nu
   assert.equal(calls.length, 1);
   const [c] = calls;
   assert.equal(c.to, '+919840012345');
-  assert.equal(c.text, 'Hi Ravi, rent of ₹7,500 for A-1 (Nov 2026) is due today. Total unpaid: ₹22,500.');
+  assert.equal(c.text, 'Hi Ravi, your Nov 2026 rent of ₹7,500 for A-1 is due today. Earlier unpaid rent: ₹15,000. Total due: ₹22,500.');
   assert.match(c.id, /^rent-\d+$/);
   assert.deepEqual([c.deviceToken, c.secret, c.serviceAccount.project_id], ['device', 'secret', 'p']);
 
@@ -73,6 +73,38 @@ test('texts tenants due today with what they owe; skips paid, later, unusable nu
   assert.equal(calls[1].id, c.id);
   // response holds no phone numbers or texts
   assert.ok(!JSON.stringify(out).includes('9840'));
+});
+
+test('lending: borrowers with interest due today get a text with total pending; non-rent categories say "payment"', async () => {
+  const ok = as(ta);
+  // Ramesh: interest due Oct 5 and Nov 5, nothing paid → ₹2,000 due today, ₹4,000 pending
+  const ramesh = await ok('POST', '/borrowers', { name: 'Ramesh', phone: '9988776655' }, 201);
+  const loan = await ok('POST', '/loans', { borrowerId: ramesh.id, principal: 100000, monthlyInterest: 2000, startDate: '2026-09-05' }, 201);
+  // Suma: only Nov 5 due, already paid → no text
+  const suma = await ok('POST', '/borrowers', { name: 'Suma', phone: '9988776600' }, 201);
+  await ok('POST', '/loans', { borrowerId: suma.id, principal: 50000, monthlyInterest: 1000, startDate: '2026-10-05' }, 201);
+  await ok('POST', '/payments', { borrowerId: suma.id, amount: 1000, paymentDate: '2026-11-04' }, 201);
+  // a parking regular due today
+  const cat = await ok('POST', '/categories', { name: 'Parking', unitLabel: 'Vehicle pass', payerLabel: 'Regular' }, 201);
+  const lot = await ok('POST', `/categories/${cat.id}/places`, { name: 'Parking' }, 201);
+  const pass = await ok('POST', `/places/${lot.id}/units`, { name: 'Car #1', defaultAmount: 1500 }, 201);
+  await ok('POST', '/agreements', { unitId: pass.id, newPayer: { name: 'Kiran', phone: '9123456780' }, startDate: '2026-11-01', dueDay: 5,
+    amount: 1500, timing: 'IN_ADVANCE', firstMonthRule: 'FULL', lastMonthRule: 'FULL' }, 201);
+
+  const out = await job();
+  const byText = (name) => calls.find((c) => c.text.startsWith(`Hi ${name},`));
+  assert.equal(byText('Ramesh').text, 'Hi Ramesh, your Nov 2026 interest of ₹2,000 is due today. Earlier unpaid interest: ₹2,000. Total due: ₹4,000.');
+  assert.equal(byText('Ramesh').to, '+919988776655');
+  assert.match(byText('Ramesh').id, /^loan-\d+$/);
+  assert.equal(byText('Suma'), undefined);
+  assert.equal(byText('Kiran').text, 'Hi Kiran, your Nov 2026 payment of ₹1,500 for Car #1 is due today.');
+  assert.equal(byText('Ravi').text.includes('rent of ₹7,500'), true); // "Rent" category keeps "rent"
+  assert.equal(out.sent, 4); // Ravi, Sita, Kiran, Ramesh (A-3 skipped, A-4 due later, Suma paid)
+  assert.deepEqual(out.failed, []);
+  // a lending entry that can't be sent is reported by loan id
+  await prisma.borrower.update({ where: { id: ramesh.id }, data: { phone: '1' } });
+  const again = await job();
+  assert.ok(again.skipped.some((s) => s.loanId === loan.id && s.reason === 'phone number not usable'));
 });
 
 test('job key required; 503 when the gateway is not configured; a send error is reported, not thrown', async () => {

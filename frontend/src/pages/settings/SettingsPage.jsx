@@ -16,15 +16,16 @@ function SmsRemindersCard() {
   };
   return (
     <Card className="space-y-3">
-      <h2 className="text-lg font-black">SMS rent reminders</h2>
+      <h2 className="text-lg font-black">SMS due-date reminders</h2>
       <ErrorNote>{error}</ErrorNote>
       <label className="flex items-start gap-3 font-semibold">
         <input type="checkbox" className="mt-1 h-5 w-5 accent-current" checked={!!on} disabled={on === null} onChange={toggle} />
         <span>
-          Text my tenants on their due date
+          Text my tenants and borrowers on their due date
           <span className="block text-sm text-muted">
-            Once a day (9:00 AM IST), each tenant whose rent is due that day and not fully paid gets an SMS with the amount
-            due and their total unpaid, sent from the phone running SMS Push Gateway. Uses the phone number on the tenant's record.
+            Once a day (9:00 AM IST), each tenant or regular whose payment is due that day, and each borrower whose interest
+            is due that day, gets an SMS with the amount due and their total still owed if it is more, as long as it isn't
+            fully paid. Sent from the phone running SMS Push Gateway, to the number on their record.
           </span>
         </span>
       </label>

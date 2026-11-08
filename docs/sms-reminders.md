@@ -1,8 +1,14 @@
-# SMS rent reminders
+# SMS due-date reminders
 
-Each day at 09:00 IST, FinLedger texts every tenant whose rent is due **that day** and not fully paid. The text gives that month's amount and, when more is owed, the tenant's total unpaid:
+Each day at 09:00 IST, FinLedger texts everyone whose payment is due **that day** and not fully paid:
 
-> Hi Ravi, rent of ₹7,500 for A-1 (Nov 2026) is due today. Total unpaid: ₹22,500.
+- **Tenants and regulars, in any category.** The text says "rent" when the category name contains "rent", and "payment" otherwise:
+  > Hi Ravi, your Nov 2026 rent of ₹7,500 for A-1 is due today. Earlier unpaid rent: ₹15,000. Total due: ₹22,500.
+  > Hi Kiran, your Nov 2026 payment of ₹1,500 for Car #1 is due today.
+- **Borrowers (Lending), for monthly interest.** "Earlier unpaid" covers all of that borrower's active loans:
+  > Hi Ramesh, your Nov 2026 interest of ₹2,000 is due today. Earlier unpaid interest: ₹2,000. Total due: ₹4,000.
+
+"Earlier unpaid" and "Total due" only appear when something from before today is still unpaid. A borrower with two loans due the same day gets two texts.
 
 The SMS goes out from your own phone through the SMS Push Gateway app (`my_proj/android_in_app`, see its `SETUP.md`).
 
@@ -13,10 +19,10 @@ GitHub Actions (daily) ──POST /api/jobs/rent-reminders + X-Job-Key──▶ 
 
 ## Who gets a text
 
-- Only accounts that switched on **Settings → SMS rent reminders** (off by default). One phone sends for every account that switches it on.
-- Active agreements with a due dated today (IST) that still has money unpaid.
-- The tenant's phone from their payer record. A 10-digit number (or one starting with 0) gets `+91`; set `SMS_DEFAULT_COUNTRY_CODE` to change that. Numbers that can't be read are skipped and listed in the job output.
-- Each text has a fixed id per due (`rent-<dueId>`). If the job runs twice in one day, the phone drops the repeat.
+- Only accounts that switched on **Settings → SMS due-date reminders** (off by default). One phone sends for every account that switches it on.
+- Active agreements and active loans with a due dated today (IST) that still has money unpaid.
+- The phone number on the tenant's or borrower's record. A 10-digit number (or one starting with 0) gets `+91`; set `SMS_DEFAULT_COUNTRY_CODE` to change that. Numbers that can't be read are skipped and listed in the job output.
+- Each text has a fixed id per due (`rent-<dueId>`, `loan-<interestRecordId>`). If the job runs twice in one day, the phone drops the repeat.
 
 ## Deploy (once)
 
@@ -40,7 +46,7 @@ GitHub Actions (daily) ──POST /api/jobs/rent-reminders + X-Job-Key──▶ 
 The output is safe to keep in Actions logs: it holds no phone numbers or texts.
 
 ```json
-{ "date": "2026-11-05", "sent": 3, "skipped": [{ "agreementId": 7, "reason": "phone number not usable" }], "failed": [] }
+{ "date": "2026-11-05", "sent": 3, "skipped": [{ "agreementId": 7, "reason": "phone number not usable" }, { "loanId": 4, "reason": "phone number not usable" }], "failed": [] }
 ```
 
 - `sent`: Google accepted the push. Whether the SMS was then sent and delivered shows in the phone app's log.
