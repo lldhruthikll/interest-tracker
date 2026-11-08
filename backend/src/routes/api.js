@@ -16,6 +16,7 @@ const payerController = require('../controllers/payerController');
 const agreementController = require('../controllers/agreementController');
 const overviewController = require('../controllers/overviewController');
 const debtController = require('../controllers/debtController');
+const reminderController = require('../controllers/reminderController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -30,9 +31,15 @@ router.get('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminContr
 router.post('/admin/members', authenticate, requireRole('ADMIN'), wrap(adminController.createMember));
 router.put('/admin/members/:id', authenticate, requireRole('ADMIN'), wrap(adminController.updateMember));
 
+// Scheduled jobs: authenticated by X-Job-Key (JOB_SECRET), not a user session
+router.post('/jobs/rent-reminders', wrap(reminderController.rentReminders));
+
 // Owner routes: every query below goes through req.db, pinned to the caller's ownerId.
 const ownerScope = (req, res, next) => { req.db = forOwner(req.user.id); next(); };
 router.use(authenticate, requirePasswordChanged, requireRole('ADMIN', 'MEMBER'), ownerScope);
+
+// Account preferences
+router.put('/me/preferences', wrap(authController.updatePreferences));
 
 // Dashboard
 router.get('/dashboard', wrap(dashboardController.getDashboardStats));

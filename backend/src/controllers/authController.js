@@ -33,7 +33,7 @@ async function login(req, res) {
 async function getProfile(req, res) {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, username: true, name: true, role: true, mustChangePassword: true, createdAt: true },
+    select: { id: true, username: true, name: true, role: true, mustChangePassword: true, smsReminders: true, createdAt: true },
   });
   res.json(user);
 }
@@ -54,4 +54,12 @@ async function changePassword(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { login, getProfile, changePassword };
+// Owner-only (mounted under the ADMIN/MEMBER routes). Today: the SMS rent reminder switch.
+async function updatePreferences(req, res) {
+  const { smsReminders } = req.body || {};
+  if (typeof smsReminders !== 'boolean') throw new ValidationError('smsReminders must be true or false');
+  const user = await prisma.user.update({ where: { id: req.user.id }, data: { smsReminders }, select: { smsReminders: true } });
+  res.json(user);
+}
+
+module.exports = { login, getProfile, changePassword, updatePreferences };

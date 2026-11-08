@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { HttpError } = require('./lib/errors');
 const apiRoutes = require('./routes/api');
 const portalRoutes = require('./routes/portal');
 
@@ -35,7 +36,8 @@ function createApp() {
 
   // Error Handler
   app.use((err, req, res, next) => {
-    if (err.status && err.status < 500) return res.status(err.status).json({ error: err.message });
+    // Our own HttpErrors carry deliberate messages (e.g. 503 'SMS gateway is not configured'); other 5xx stay masked.
+    if (err.status && (err.status < 500 || err instanceof HttpError)) return res.status(err.status).json({ error: err.message });
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not found' });
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already exists' });
     console.error('Unhandled server error:', err);

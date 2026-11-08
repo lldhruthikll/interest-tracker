@@ -17,6 +17,7 @@ model User {
   role               String   @default("MEMBER") // ADMIN, MEMBER, PAYER
   active             Boolean  @default(true)
   mustChangePassword Boolean  @default(false)
+  smsReminders       Boolean  @default(false) // text tenants on their due date via the SMS Push Gateway
   payerId            Int?     @unique
   payer              Payer?   @relation("PayerLogin", fields: [payerId], references: [id])
 

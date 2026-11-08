@@ -5,6 +5,33 @@ import { useAuth } from '../../context/AuthContext';
 import { ThemeSwitch } from '../../lib/theme';
 import { Button, Card, Table, Field, Loading, ErrorNote, PageHeader } from '../../components/ui';
 
+function SmsRemindersCard() {
+  const [on, setOn] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => { api.getProfile().then((p) => setOn(!!p.smsReminders)).catch((e) => setError(e.message)); }, []);
+  const toggle = async (e) => {
+    const next = e.target.checked;
+    setError('');
+    try { setOn((await api.updatePreferences({ smsReminders: next })).smsReminders); } catch (err) { setError(err.message); }
+  };
+  return (
+    <Card className="space-y-3">
+      <h2 className="text-lg font-black">SMS rent reminders</h2>
+      <ErrorNote>{error}</ErrorNote>
+      <label className="flex items-start gap-3 font-semibold">
+        <input type="checkbox" className="mt-1 h-5 w-5 accent-current" checked={!!on} disabled={on === null} onChange={toggle} />
+        <span>
+          Text my tenants on their due date
+          <span className="block text-sm text-muted">
+            Once a day (9:00 AM IST), each tenant whose rent is due that day and not fully paid gets an SMS with the amount
+            due and their total unpaid, sent from the phone running SMS Push Gateway. Uses the phone number on the tenant's record.
+          </span>
+        </span>
+      </label>
+    </Card>
+  );
+}
+
 function PasswordCard() {
   const [f, setF] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [error, setError] = useState('');
@@ -104,6 +131,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title="Settings" sub={user?.name} />
       <Card><ThemeSwitch /></Card>
+      <SmsRemindersCard />
       <PasswordCard />
       <ArchivedCard />
       {user?.role === 'ADMIN' && <FamilyCard />}

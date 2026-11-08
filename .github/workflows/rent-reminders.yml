@@ -1,0 +1,26 @@
+# Daily SMS rent reminders: asks the FinLedger API to text tenants whose rent is due today.
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   FINLEDGER_API_URL     e.g. https://<render-host>/api   (no trailing slash)
+#   FINLEDGER_JOB_SECRET  same value as JOB_SECRET on the Render backend
+name: Rent reminders
+
+on:
+  schedule:
+    - cron: '30 3 * * *' # 03:30 UTC = 09:00 IST
+  workflow_dispatch: {}  # "Run workflow" button for a manual run
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call FinLedger
+        env:
+          API: ${{ secrets.FINLEDGER_API_URL }}
+          KEY: ${{ secrets.FINLEDGER_JOB_SECRET }}
+        run: |
+          test -n "$API" && test -n "$KEY" || { echo "Set FINLEDGER_API_URL and FINLEDGER_JOB_SECRET repo secrets"; exit 1; }
+          # A sleeping Render free instance can take a minute to wake: retry and allow a long first response.
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 30 --retry-all-errors --max-time 180 \
+            -X POST -H "X-Job-Key: $KEY" "$API/jobs/rent-reminders"
+          echo

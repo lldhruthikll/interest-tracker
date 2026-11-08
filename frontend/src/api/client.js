@@ -47,6 +47,7 @@ export const api = {
   login: (credentials) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   getProfile: () => apiFetch('/auth/profile'),
+  updatePreferences: (d) => apiFetch('/me/preferences', { method: 'PUT', body: JSON.stringify(d) }),
   changePassword: (data) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
   getCreditors: () => apiFetch('/creditors'),
