@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button, Card, Chips, Field, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
-import { formatINR } from '../../lib/format';
+import { formatINR, periodLabel, todayIST } from '../../lib/format';
 import useCategory from './useCategory';
 import MoveInModal from './modals/MoveInModal';
 import RecurringPaymentModal from './modals/RecurringPaymentModal';
@@ -69,7 +69,7 @@ export default function CategoryDashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Received this month" value={formatINR(s.collectedThisMonth)} note={`of ${formatINR(s.dueThisMonth)} due`} tone="paid" />
+        <StatCard label="Received this month" value={formatINR(s.collectedThisMonth)} note={`of ${formatINR(s.dueThisMonth)} billed for ${periodLabel(todayIST().slice(0, 7)).slice(0, 3)}`} tone="paid" />
         <StatCard label="Pending" value={formatINR(s.pending)} note={s.overdue ? `${formatINR(s.overdue)} overdue` : 'Nothing overdue'} tone={s.overdue ? 'overdue' : 'partial'} />
         <StatCard label="Owed back (not income)" value={formatINR(s.advancesHeld + s.credit)}
           note={`Advances ${formatINR(s.advancesHeld)} · Credit ${formatINR(s.credit)}`} tone="advance" />
