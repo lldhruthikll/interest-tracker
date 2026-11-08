@@ -35,6 +35,9 @@ function niceStep(max) {
   return [1, 2, 2.5, 5, 10].map((m) => m * p).find((s) => s >= raw);
 }
 
+// On the chart, "Lending" alone reads like money lent out; what it counts is interest received.
+const chartName = (l) => (l.key === 'lending' ? 'Lending interest' : l.name);
+
 function TrendChart({ trend, ledgers }) {
   const [hover, setHover] = useState(null);
   // left axis gutter, right gutter (average label), plot width, plot height, room for the current-month label
@@ -108,12 +111,18 @@ function TrendChart({ trend, ledgers }) {
             // beside the bar, never over it: right of it in the first half, left of it in the second
             style={hover < n / 2 ? { left: `${((xOf(hover) + barW + 14) / W) * 100}%` } : { right: `${(1 - (xOf(hover) - 14) / W) * 100}%` }}>
             <div className="font-extrabold">{periodLabel(tip.period)}</div>
-            <div className="mb-1.5 text-lg font-black tabnum">{formatINR(totals[hover])}</div>
+            <div className="text-lg font-black tabnum">{formatINR(totals[hover])} received</div>
+            {tip.earlier > 0 && (
+              <div className="text-xs font-semibold text-muted">
+                <span className="tabnum">{formatINR(totals[hover] - tip.earlier)}</span> for {periodLabel(tip.period).slice(0, 3)} · <span className="tabnum">{formatINR(tip.earlier)}</span> for earlier months
+              </div>
+            )}
+            <div className="mb-1.5" />
             {ledgers.map((l, li) => (
               <div key={l.key} className="flex items-center gap-2 py-0.5">
                 <Swatch fill={fillOf(li)} />
                 <span className="font-black tabnum">{formatINR(tip.byLedger[l.key] || 0)}</span>
-                <span className="truncate font-semibold text-muted">{l.name}</span>
+                <span className="truncate font-semibold text-muted">{chartName(l)}</span>
               </div>
             ))}
           </div>
@@ -121,7 +130,7 @@ function TrendChart({ trend, ledgers }) {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-muted">
         {ledgers.map((l, i) => (
-          <span key={l.key} className="flex items-center gap-1.5"><Swatch fill={fillOf(i)} /> {l.name}</span>
+          <span key={l.key} className="flex items-center gap-1.5"><Swatch fill={fillOf(i)} /> {chartName(l)}</span>
         ))}
         <span className="flex items-center gap-1.5"><svg width="18" height="6" aria-hidden="true"><line x1="0" y1="3" x2="18" y2="3" style={{ stroke: 'rgb(var(--ink) / .7)' }} strokeWidth="1.5" strokeDasharray="5 4" /></svg> 12-month average</span>
       </div>
@@ -207,7 +216,8 @@ export default function OverviewPage() {
       </div>
 
       <Card>
-        <h2 className="mb-3 text-lg font-black">Received, last 12 months</h2>
+        <h2 className="text-lg font-black">Money received each month</h2>
+        <p className="mb-3 text-sm font-semibold text-muted">Interest and rent you collected, counted in the month it was paid</p>
         <TrendChart trend={trend} ledgers={ledgers} />
       </Card>
 

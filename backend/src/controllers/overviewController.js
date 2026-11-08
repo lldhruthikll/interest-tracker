@@ -81,16 +81,22 @@ async function getOverview(req, res) {
 
     // received[key][period] in paise. ponytail: fetches every allocation in the window; SQL GROUP BY if it gets slow.
     const received = Object.fromEntries(ledgers.map((l) => [l.key, Object.fromEntries(periods.map((p) => [p, 0]))]));
-    const add = (key, period, amount) => { if (received[key]?.[period] !== undefined) received[key][period] += toPaise(amount); };
+    // earlier[period]: the part of that month's receipts that paid dues of earlier months (catch-up)
+    const earlier = Object.fromEntries(periods.map((p) => [p, 0]));
+    const add = (key, period, amount, duePeriod) => {
+      if (received[key]?.[period] === undefined) return;
+      received[key][period] += toPaise(amount);
+      if (duePeriod < period) earlier[period] += toPaise(amount);
+    };
     const lendingAllocs = await tx.paymentAllocation.findMany({
       where: { payment: { paymentDate: { gte: new Date(`${periods[0]}-01T00:00:00+05:30`), lt: new Date(`${addMonths(month, 1)}-01T00:00:00+05:30`) } } },
-      select: { amount: true, payment: { select: { paymentDate: true } } } });
-    for (const a of lendingAllocs) add(LENDING.key, istPeriod(a.payment.paymentDate), a.amount);
+      select: { amount: true, payment: { select: { paymentDate: true } }, interestRecord: { select: { dueDate: true } } } });
+    for (const a of lendingAllocs) add(LENDING.key, istPeriod(a.payment.paymentDate), a.amount, toDateOnly(a.interestRecord.dueDate).slice(0, 7));
     const recAllocs = await tx.recurringAllocation.findMany({
       where: { payment: { paymentDate: { gte: toDbDate(`${periods[0]}-01`), lt: toDbDate(`${addMonths(month, 1)}-01`) } } },
       select: { amount: true, payment: { select: { paymentDate: true } },
-        due: { select: { agreement: { select: { unit: { select: { place: { select: { categoryId: true } } } } } } } } } });
-    for (const a of recAllocs) add(catKey(a.due.agreement.unit.place.categoryId), toDateOnly(a.payment.paymentDate).slice(0, 7), a.amount);
+        due: { select: { period: true, agreement: { select: { unit: { select: { place: { select: { categoryId: true } } } } } } } } } });
+    for (const a of recAllocs) add(catKey(a.due.agreement.unit.place.categoryId), toDateOnly(a.payment.paymentDate).slice(0, 7), a.amount, a.due.period);
 
     const retained = Object.fromEntries(ledgers.map((l) => [l.key, 0]));
     const kept = await tx.advanceEntry.findMany({ where: { type: 'RETAINED',
@@ -111,7 +117,7 @@ async function getOverview(req, res) {
     const soon = (await dueItems(tx, cats, addDays(today, 1), addDays(today, 7), { activeOnly: true })).filter((i) => unpaid(i) > 0);
     const lent = await tx.loan.aggregate({ where: { status: 'ACTIVE' }, _sum: { principal: true } });
     const debts = await debtSummary(tx, month);
-    return { rows, advances, credit, received, ledgers, soon, owed, lentOutPaise: toPaise(lent._sum.principal ?? 0), debts };
+    return { rows, advances, credit, received, earlier, ledgers, soon, owed, lentOutPaise: toPaise(lent._sum.principal ?? 0), debts };
   }, { timeout: 30000 });
 
   const sum = (f) => out.rows.reduce((s, l) => s + f(l), 0);
@@ -124,7 +130,7 @@ async function getOverview(req, res) {
     lentOut: rupees(out.lentOutPaise),
     debts: { owed: d.owed, repaidThisMonth: d.repaidThisMonth,
       people: creditors.filter((c) => c.left > 0).map((c) => ({ id: c.id, name: c.name, left: c.left })) },
-    trend: periods.map((period) => ({ period,
+    trend: periods.map((period) => ({ period, earlier: rupees(out.earlier[period]),
       byLedger: Object.fromEntries(out.ledgers.map((l) => [l.key, rupees(out.received[l.key][period])])) })),
     upcoming: out.soon.map((i) => listItem(i, unpaid(i))),
     overdueList: out.owed.filter((i) => i.date < today && unpaid(i) > 0).map((i) => listItem(i, unpaid(i))),

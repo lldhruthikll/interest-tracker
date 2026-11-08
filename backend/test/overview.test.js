@@ -58,6 +58,8 @@ test('overview: received by payment date, deposits excluded, pending/overdue, ow
   assert.deepEqual([o.trend[0].period, o.trend[11].period], ['2025-12', '2026-11']);
   assert.deepEqual(o.trend[11].byLedger, { lending: 2000, [key]: 7000 });
   assert.deepEqual(o.trend[10].byLedger, { lending: 0, [key]: 0 });
+  assert.equal(o.trend[11].earlier, 9000); // both Nov payments cleared October dues (FIFO)
+  assert.equal(o.trend[10].earlier, 0);
   assert.deepEqual(o.upcoming.map((i) => [i.ledgerKey, i.date, i.amount]).sort((x, y) => x[2] - y[2]),
     [['lending', '2026-11-05', 2000], [key, '2026-11-05', 3000], [key, '2026-11-05', 7000]]);
   assert.deepEqual(Object.keys(o.upcoming[0]).sort(), ['amount', 'date', 'ledgerKey', 'ledgerName', 'link', 'title']);
