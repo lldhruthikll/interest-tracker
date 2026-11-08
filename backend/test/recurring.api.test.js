@@ -51,7 +51,6 @@ test('categories, places, units: tree with labels, archive, delete guard, valida
     ['Building A', [['A-1', 31000, 'VACANT', null], ['A-2', 3000, 'VACANT', null]]],
     ['Building B', [['B-1', 3000, 'VACANT', null]]]]);
 
-  assert.equal(await status('DELETE', `/categories/${ids.cat}`), 409); // has places
   await ok('PUT', `/categories/${ids.cat}`, { archived: true });
   assert.deepEqual(await ok('GET', '/categories'), []);
   assert.equal((await ok('GET', '/categories?all=1')).length, 1);

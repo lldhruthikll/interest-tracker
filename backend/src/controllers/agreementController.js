@@ -5,7 +5,7 @@ const { parseAmountPaise, fromPaise } = require('../lib/money');
 const { todayIST, toDateOnly, toDbDate, isValidDateStr, periodOf, addMonths, clampDay } = require('../lib/dates');
 const { requireOwned } = require('../lib/ownerDb');
 const { buildSchedule } = require('../services/schedule');
-const { lockAgreement, syncAgreement, reallocate, agreementBalances } = require('../services/recurringSync');
+const { OPENING, lockAgreement, syncAgreement, reallocate, agreementBalances } = require('../services/recurringSync');
 const { suggestedCreditorId } = require('./debtController');
 
 const TIMINGS = ['IN_ADVANCE', 'IN_ARREARS'];
@@ -79,6 +79,7 @@ async function createAgreement(req, res) {
   const advance = b.advanceAmount != null &&
     { amount: money(b.advanceAmount), date: toDbDate(date(b.advanceDate ?? startDate, 'advanceDate')) };
   const { notes = null } = fields(b, { notes: 'opt' });
+  const previous = b.previousBalance != null && b.previousBalance !== '' && Number(b.previousBalance) !== 0 ? money(b.previousBalance) : null;
 
   const out = await req.db.$transaction(async (tx) => {
     const unit = await requireOwned(tx, 'unit', unitId);
@@ -88,10 +89,28 @@ async function createAgreement(req, res) {
     const a = await tx.agreement.create({ data: { unitId, payerId: payer.id, startDate: toDbDate(startDate), ...settings, notes } });
     await tx.rateChange.create({ data: { agreementId: a.id, amount, effectiveFrom: periodOf(startDate) } });
     if (advance) await tx.advanceEntry.create({ data: { agreementId: a.id, type: 'RECEIVED', ...advance } });
+    if (previous) await tx.recurringDue.create({ data: { agreementId: a.id, period: OPENING, dueDate: toDbDate(startDate), amount: previous } });
     await syncAgreement(tx, a.id);
     return detail(tx, a.id);
   });
   res.status(201).json(out);
+}
+
+// Set, change or (amount 0) remove what the tenant owed before this agreement was entered. Payments are
+// re-applied from scratch, so lowering it below what was already paid turns the excess into credit.
+async function setPreviousBalance(req, res) {
+  const id = parseId(req.params.id);
+  const remove = req.body.amount === 0 || req.body.amount === '0' || req.body.amount === '';
+  const amount = remove ? null : money(req.body.amount);
+  res.json(await req.db.$transaction(async (tx) => {
+    const a = await lockActive(tx, id);
+    const existing = await tx.recurringDue.findFirst({ where: { agreementId: id, period: OPENING } });
+    if (remove) { if (existing) await tx.recurringDue.delete({ where: { id: existing.id } }); }
+    else if (existing) await tx.recurringDue.update({ where: { id: existing.id }, data: { amount } });
+    else await tx.recurringDue.create({ data: { agreementId: id, period: OPENING, dueDate: a.startDate, amount } });
+    await syncAgreement(tx, id);
+    return detail(tx, id);
+  }));
 }
 
 async function getAgreement(req, res) {
@@ -109,7 +128,7 @@ async function updateBilling(req, res) {
     await lockActive(tx, id);
     await tx.agreement.update({ where: { id }, data: billing(req.body, true) });
     // never touch collected money: drop dues with nothing paid; sync regenerates them on the new settings
-    await tx.recurringDue.deleteMany({ where: { agreementId: id, paidAmount: 0 } });
+    await tx.recurringDue.deleteMany({ where: { agreementId: id, paidAmount: 0, period: { not: OPENING } } });
     await syncAgreement(tx, id);
     return detail(tx, id);
   }));
@@ -205,4 +224,4 @@ async function moveOut(req, res) {
   res.json(out);
 }
 
-module.exports = { previewAgreement, createAgreement, getAgreement, updateBilling, addRate, addAdvance, moveOutPreview, moveOut };
+module.exports = { previewAgreement, createAgreement, getAgreement, setPreviousBalance, updateBilling, addRate, addAdvance, moveOutPreview, moveOut };

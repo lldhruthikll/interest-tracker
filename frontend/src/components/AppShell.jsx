@@ -12,6 +12,45 @@ export const refreshCategories = () => window.dispatchEvent(new Event('categorie
 const item = ({ isActive }) =>
   `block rounded-2xl px-3.5 py-2.5 font-medium ${isActive ? 'bg-accent text-accent-ink' : 'text-muted hover:text-ink'}`;
 
+// Finds tenants/regulars (name, phone, unit) and borrowers (name, phone) across every ledger.
+function GlobalSearch() {
+  const [q, setQ] = useState('');
+  const [res, setRes] = useState(null);
+  const { pathname } = useLocation();
+  useEffect(() => { setQ(''); setRes(null); }, [pathname]);
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setRes(null); return undefined; }
+    let live = true;
+    const t = setTimeout(() => api.search(term).then((r) => live && setRes(r)).catch(() => live && setRes({ tenants: [], borrowers: [] })), 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [q]);
+  const link = 'block rounded-xl px-3 py-2 text-sm hover:bg-accent hover:text-accent-ink';
+  return (
+    <div className="px-1 pb-1">
+      <input type="search" aria-label="Search tenants and borrowers" placeholder="Search name, shop, phone…" value={q}
+        onChange={(e) => setQ(e.target.value)} className="field !py-2 text-sm" />
+      {res && (
+        <div className="glass-in mt-2 max-h-80 overflow-y-auto rounded-2xl p-1.5" aria-live="polite">
+          {res.tenants.length + res.borrowers.length === 0 && <p className="px-3 py-2 text-sm font-semibold text-muted">No matches.</p>}
+          {res.tenants.map((t) => (
+            <NavLink key={`t${t.agreementId}`} to={`/agreements/${t.agreementId}`} className={link}>
+              <span className="block truncate font-bold">{t.name}{t.status === 'ENDED' ? ' (moved out)' : ''}</span>
+              <span className="block truncate text-xs opacity-75">{t.unit} · {t.category} · {t.phone}</span>
+            </NavLink>
+          ))}
+          {res.borrowers.map((b) => (
+            <NavLink key={`b${b.id}`} to={`/lending/borrowers/${b.id}`} className={link}>
+              <span className="block truncate font-bold">{b.name}</span>
+              <span className="block truncate text-xs opacity-75">Borrower · {b.phone}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Brand() {
   return (
     <div className="flex items-center gap-2 px-2.5 pb-3.5 pt-1 text-[17px] font-black">
@@ -42,6 +81,7 @@ export default function AppShell() {
   const menu = (
     <nav aria-label="Main" className="flex flex-col gap-2">
       <Brand />
+      <GlobalSearch />
       <NavLink to="/" end className={item}>Overview</NavLink>
       <div className="px-3 pt-2.5 text-[10px] font-extrabold uppercase tracking-[.08em] text-muted">Ledgers</div>
       <NavLink to="/lending" className={item}>Lending</NavLink>

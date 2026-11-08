@@ -7,6 +7,10 @@ const { todayIST, toDateOnly, toDbDate, periodOf } = require('../lib/dates');
 
 const sum = (rows, f = (r) => toPaise(r.amount)) => rows.reduce((s, r) => s + f(r), 0);
 
+// A tenant's balance from before the app ("previous balance") is one due with this period: it sorts before
+// every real month, so FIFO pays it first, and the schedule never produces or adjusts it.
+const OPENING = '0000-00';
+
 // Row lock held to transaction end. Raw SQL skips the owner scope: callers requireOwned first.
 const lockAgreement = (db, id) => db.$queryRaw`SELECT id FROM "Agreement" WHERE id = ${id} FOR NO KEY UPDATE`;
 
@@ -125,4 +129,4 @@ async function unitStatus(db, unitId) {
   return 'UPCOMING';
 }
 
-module.exports = { scheduleInput, currentRate, lockAgreement, syncAgreement, reallocate, agreementBalances, syncOwner, syncCategory, unitStatus };
+module.exports = { OPENING, scheduleInput, currentRate, lockAgreement, syncAgreement, reallocate, agreementBalances, syncOwner, syncCategory, unitStatus };

@@ -47,6 +47,10 @@ export const api = {
   login: (credentials) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   getProfile: () => apiFetch('/auth/profile'),
+  search: (q) => apiFetch(`/search?q=${encodeURIComponent(q)}`),
+  setPreviousBalance: (id, amount) => apiFetch(`/agreements/${id}/previous-balance`, { method: 'PUT', body: JSON.stringify({ amount }) }),
+  deletePlace: (id) => apiFetch(`/places/${id}`, { method: 'DELETE' }),
+  deleteUnit: (id) => apiFetch(`/units/${id}`, { method: 'DELETE' }),
   updatePreferences: (d) => apiFetch('/me/preferences', { method: 'PUT', body: JSON.stringify(d) }),
   changePassword: (data) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),

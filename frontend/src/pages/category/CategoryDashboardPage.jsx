@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Button, Card, Chips, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
+import { Button, Card, Chips, Field, StatCard, StatusPill, Table, Loading, ErrorNote, PageHeader } from '../../components/ui';
 import { formatINR } from '../../lib/format';
 import useCategory from './useCategory';
 import MoveInModal from './modals/MoveInModal';
@@ -14,6 +14,7 @@ export default function CategoryDashboardPage() {
   const navigate = useNavigate();
   const { cat, error: catError, reload: reloadCat } = useCategory(categoryId);
   const [placeId, setPlaceId] = useState('');
+  const [q, setQ] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -37,6 +38,9 @@ export default function CategoryDashboardPage() {
   const refresh = () => { reloadCat(); return load(); };
   const exportXlsx = async () => { setActionError(''); try { await api.exportCategory(cat.id, cat.name.replace(/\s+/g, '_')); } catch (e) { setActionError(e.message); } };
   const activeUnits = units.filter((u) => u.agreementId);
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? units.filter((u) => [u.unitName, u.placeName, u.payer?.name, u.payer?.phone]
+    .some((v) => v && String(v).toLowerCase().includes(needle))) : units;
 
   const columns = [
     { key: 'unitName', header: L.unit, render: (u) => (u.agreementId
@@ -74,7 +78,10 @@ export default function CategoryDashboardPage() {
       </div>
 
       <Card>
-        <Table columns={columns} rows={units} empty={`No ${L.unit.toLowerCase()} yet. Add some under Manage.`} />
+        <div className="mb-3 max-w-sm">
+          <Field label={`Search ${L.payer.toLowerCase()}, ${L.unit.toLowerCase()} or phone`} type="search" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Table columns={columns} rows={shown} empty={needle ? `No match for "${q.trim()}".` : `No ${L.unit.toLowerCase()} yet. Add some under Manage.`} />
       </Card>
 
       {moveIn && <MoveInModal open cat={cat} unitId={moveIn.unitId} onClose={() => setMoveIn(null)}

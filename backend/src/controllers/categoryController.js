@@ -76,7 +76,7 @@ async function getDashboard(req, res) {
     for (const u of unitRows) {
       const [a] = u.agreements;
       units.push({ unitId: u.id, unitName: u.name, placeName: u.place.name,
-        payer: a ? { id: a.payer.id, name: a.payer.name } : null, agreementId: a?.id ?? null,
+        payer: a ? { id: a.payer.id, name: a.payer.name, phone: a.payer.phone } : null, agreementId: a?.id ?? null,
         amount: (a && currentRate(a.rateChanges, today)) ?? Number(u.defaultAmount), status: await unitStatus(tx, u.id) });
     }
 
@@ -134,12 +134,43 @@ async function updateCategory(req, res) {
   }));
 }
 
+// Delete is allowed only while nothing under it ever had a tenant: agreements carry dues and payments,
+// which must never disappear. Anything with history can be archived instead.
+async function refuseDeleteWithHistory(tx, unitWhere, label) {
+  if (await tx.agreement.count({ where: { unit: unitWhere } })) {
+    throw new HttpError(409, `${label} has tenant history (current or past); archive it instead`);
+  }
+}
+
 async function deleteCategory(req, res) {
   const id = parseId(req.params.id);
   await req.db.$transaction(async (tx) => {
     await requireOwned(tx, 'category', id);
-    if (await tx.place.count({ where: { categoryId: id } })) throw new HttpError(409, 'Category has places; archive it instead');
+    await refuseDeleteWithHistory(tx, { place: { categoryId: id } }, 'Category');
+    await tx.unit.deleteMany({ where: { place: { categoryId: id } } });
+    await tx.place.deleteMany({ where: { categoryId: id } });
     await tx.category.delete({ where: { id } });
+  });
+  res.json({ deleted: true });
+}
+
+async function deletePlace(req, res) {
+  const id = parseId(req.params.id);
+  await req.db.$transaction(async (tx) => {
+    await requireOwned(tx, 'place', id);
+    await refuseDeleteWithHistory(tx, { placeId: id }, 'This group');
+    await tx.unit.deleteMany({ where: { placeId: id } });
+    await tx.place.delete({ where: { id } });
+  });
+  res.json({ deleted: true });
+}
+
+async function deleteUnit(req, res) {
+  const id = parseId(req.params.id);
+  await req.db.$transaction(async (tx) => {
+    await requireOwned(tx, 'unit', id);
+    await refuseDeleteWithHistory(tx, { id }, 'This unit');
+    await tx.unit.delete({ where: { id } });
   });
   res.json({ deleted: true });
 }
@@ -180,4 +211,4 @@ async function updateUnit(req, res) {
 }
 
 module.exports = { listCategories, createCategory, getCategory, getDashboard, updateCategory, deleteCategory,
-  createPlace, updatePlace, createUnit, updateUnit };
+  createPlace, updatePlace, deletePlace, createUnit, updateUnit, deleteUnit };

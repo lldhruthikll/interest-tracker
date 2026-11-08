@@ -9,7 +9,7 @@ const { HttpError } = require('../lib/errors');
 const { forOwner } = require('../lib/ownerDb');
 const { todayIST, toDbDate, toDateOnly } = require('../lib/dates');
 const { toPaise } = require('../lib/money');
-const { syncOwner, agreementBalances } = require('../services/recurringSync');
+const { OPENING, syncOwner, agreementBalances } = require('../services/recurringSync');
 const { syncAllActiveLoans } = require('../services/interestService');
 const smsPush = require('../lib/smsPush'); // called as smsPush.sendSms so tests can stub it
 
@@ -67,7 +67,8 @@ async function dueToday(ownerId, today) {
     await syncOwner(tx);
     await syncAllActiveLoans(tx);
     const out = [];
-    const dues = await tx.recurringDue.findMany({ where: { dueDate: toDbDate(today), agreement: { status: 'ACTIVE' } },
+    // the previous-balance due is not a month: it counts in "earlier unpaid", never as today's due
+    const dues = await tx.recurringDue.findMany({ where: { dueDate: toDbDate(today), period: { not: OPENING }, agreement: { status: 'ACTIVE' } },
       include: { agreement: { include: { payer: true, unit: { include: { place: { include: { category: true } } } } } } },
       orderBy: { id: 'asc' } });
     for (const d of dues) {

@@ -51,6 +51,8 @@ export default function ManagePlacesPage() {
   const places = flat ? (hidden ? [hidden] : []) : cat.places;
 
   const act = async (fn) => { setError(''); try { await fn(); await reload(); } catch (err) { setError(err.message); } };
+  // Only possible while nothing under it ever had a tenant; the server refuses otherwise and says so.
+  const remove = (what, fn) => { if (window.confirm(`Delete ${what}? This cannot be undone.`)) act(fn); };
   const save = async (data) => {
     const { kind, item, placeId } = edit;
     if (kind === 'place') await (item ? api.updatePlace(item.id, data) : api.createPlace(cat.id, data));
@@ -83,6 +85,7 @@ export default function ManagePlacesPage() {
             <div className="flex flex-wrap gap-2">
               <Button className="!px-3 !py-1.5 text-sm" onClick={() => setEdit({ kind: 'place', item: p })}>Edit</Button>
               <Button className="!px-3 !py-1.5 text-sm" onClick={() => act(() => api.updatePlace(p.id, { archived: !p.archived }))}>{p.archived ? 'Restore' : 'Archive'}</Button>
+              <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => remove(`${p.name} and its ${cat.unitLabel.toLowerCase()}`, () => api.deletePlace(p.id))}>Delete</Button>
               {!p.archived && <Button className="!px-3 !py-1.5 text-sm" onClick={() => setEdit({ kind: 'unit', placeId: p.id })}>+ Add {cat.unitLabel.toLowerCase()}</Button>}
             </div>
           </div>}
@@ -98,6 +101,7 @@ export default function ManagePlacesPage() {
                   <div className="flex gap-2">
                     <Button className="!px-3 !py-1.5 text-sm" onClick={() => setEdit({ kind: 'unit', placeId: p.id, item: u })}>Edit</Button>
                     <Button className="!px-3 !py-1.5 text-sm" onClick={() => act(() => api.updateUnit(u.id, { archived: !u.archived }))}>{u.archived ? 'Restore' : 'Archive'}</Button>
+                    <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => remove(u.name, () => api.deleteUnit(u.id))}>Delete</Button>
                   </div>
                 </li>
               ))}

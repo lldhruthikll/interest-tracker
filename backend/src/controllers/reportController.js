@@ -136,7 +136,7 @@ async function exportCategory(req, res) {
   const who = (a) => ({ ...(category.placeLabel && { [category.placeLabel]: a.unit.place.name }), [category.unitLabel]: a.unit.name, [category.payerLabel]: a.payer.name });
   const rows = (f) => agreements.flatMap((a) => f(a).map((r) => ({ ...who(a), ...r })));
   const sheets = {
-    Dues: rows((a) => a.dues.map((d) => ({ Period: d.period, 'Due Date': toDateOnly(d.dueDate), Amount: Number(d.amount),
+    Dues: rows((a) => a.dues.map((d) => ({ Period: d.period === '0000-00' ? 'Previous balance' : d.period, 'Due Date': toDateOnly(d.dueDate), Amount: Number(d.amount),
       Paid: Number(d.paidAmount), Status: d.status }))),
     Payments: rows((a) => a.payments.map((p) => ({ Date: toDateOnly(p.paymentDate), Amount: Number(p.amount), Method: p.method, Notes: p.notes || '' }))),
     Advances: rows((a) => a.advances.map((e) => ({ Date: toDateOnly(e.date), Type: e.type, Amount: Number(e.amount), Notes: e.notes || '' }))),

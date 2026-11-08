@@ -44,6 +44,57 @@ function AdvanceModal({ agreementId, onClose, onDone }) {
     </Modal>
   );
 }
+function TenantModal({ payer, label, onClose, onDone }) {
+  const [f, setF] = useState({ name: payer.name, phone: payer.phone, notes: payer.notes || '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await api.updatePayer(payer.id, { name: f.name.trim(), phone: f.phone.trim(), notes: f.notes.trim() }); onDone(); }
+    catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open title={`Edit ${label.toLowerCase()}`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <ErrorNote>{error}</ErrorNote>
+        <Field label="Name" required value={f.name} onChange={set('name')} />
+        <Field label="Phone" type="tel" required value={f.phone} onChange={set('phone')} />
+        <Field label="Notes (optional)" value={f.notes} onChange={set('notes')} />
+        <p className="text-sm font-semibold text-muted">Changes apply everywhere this {label.toLowerCase()} appears, including other units they rent.</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function PreviousBalanceModal({ agreementId, current, onClose, onDone }) {
+  const [amount, setAmount] = useState(current ? String(current) : '');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await api.setPreviousBalance(agreementId, amount === '' ? 0 : amount); onDone(); }
+    catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open title="Previous balance" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <ErrorNote>{error}</ErrorNote>
+        <p className="text-sm font-semibold text-muted">What this tenant already owed you before you started tracking them here. It is added to what they owe, and their payments clear it first. Enter 0 to remove it.</p>
+        <Field label="Previous balance (₹)" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 const Section = ({ title, children }) => <Card className="space-y-3"><h2 className="text-lg font-black">{title}</h2>{children}</Card>;
 const Row = ({ k, v }) => <div className="flex justify-between gap-4 py-1"><dt className="font-bold text-muted">{k}</dt><dd className="text-right font-extrabold tabnum">{v}</dd></div>;
 
@@ -66,6 +117,7 @@ export default function AgreementDetailPage() {
   const currentRate = [...a.rateChanges].reverse().find((r) => r.effectiveFrom <= today.slice(0, 7)) || a.rateChanges[0];
   const done = () => { setModal(null); load(); };
   const label = `${a.unit.name} · ${a.payer.name}`;
+  const prev = a.dues.find((d) => d.period === '0000-00');
 
   const del = async (p) => {
     if (!window.confirm('Delete this payment? This cannot be undone.')) return;
@@ -101,6 +153,8 @@ export default function AgreementDetailPage() {
         <Link className="btn" to={`/c/${cat.id}`}>Back</Link>
         {(!ended || b.unpaidPaise > 0) && <Button onClick={() => setModal('pay')}>+ Record payment</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('rent')}>Change rent</Button>}
+        <Button variant="secondary" onClick={() => setModal('tenant')}>Edit {cat.payerLabel.toLowerCase()}</Button>
+        {!ended && <Button variant="secondary" onClick={() => setModal('prev')}>Previous balance</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('billing')}>Billing settings</Button>}
         {!ended && <Button variant="secondary" onClick={() => setModal('out')}>Move out</Button>}
       </PageHeader>
@@ -116,6 +170,7 @@ export default function AgreementDetailPage() {
       <Section title="Agreement">
         <dl>
           <Row k={cat.payerLabel} v={`${a.payer.name} · ${a.payer.phone}`} />
+          {prev && <Row k="Previous balance" v={`${formatINR(prev.amount)}${Number(prev.paidAmount) >= Number(prev.amount) ? ' (cleared)' : Number(prev.paidAmount) > 0 ? ` (${formatINR(prev.amount - prev.paidAmount)} left)` : ''}`} />}
           <Row k={cat.unitLabel} v={cat.placeLabel ? `${a.unit.name} (${cat.placeLabel}: ${a.unit.place.name})` : a.unit.name} />
           <Row k="Category" v={cat.name} />
           <Row k="Current amount" v={formatINR(currentRate?.amount)} />
@@ -162,6 +217,8 @@ export default function AgreementDetailPage() {
       {modal === 'pay' && <RecurringPaymentModal open agreement={{ id: a.id, label }} unpaid={b.unpaidPaise / 100}
         suggest={a.suggestedCreditorId} canRepay={!ended} onClose={() => setModal(null)} onDone={done} />}
       {modal?.edit && <RecurringPaymentModal open agreement={{ id: a.id, label }} payment={modal.edit} onClose={() => setModal(null)} onDone={done} />}
+      {modal === 'tenant' && <TenantModal payer={a.payer} label={cat.payerLabel} onClose={() => setModal(null)} onDone={done} />}
+      {modal === 'prev' && <PreviousBalanceModal agreementId={a.id} current={prev?.amount} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'adv' && <AdvanceModal agreementId={a.id} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'rent' && <RentChangeModal open agreementId={a.id} current={currentRate?.amount} onClose={() => setModal(null)} onDone={done} />}
       {modal === 'billing' && <BillingModal open agreement={a} onClose={() => setModal(null)} onDone={done} />}

@@ -15,7 +15,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
   const [f, setF] = useState(() => {
     const u = unitMissing ? null : units.find((x) => x.id === unitId) || units[0];
     return { unitId: u?.id ?? '', startDate: todayIST(), dueDay: '1', amount: u?.defaultAmount ?? '', timing: 'IN_ADVANCE',
-      firstMonthRule: 'PRORATED', lastMonthRule: 'PRORATED', advanceAmount: '', advanceDate: todayIST(), notes: '' };
+      firstMonthRule: 'PRORATED', lastMonthRule: 'PRORATED', advanceAmount: '', advanceDate: todayIST(), previousBalance: '', notes: '' };
   });
   const [payerMode, setPayerMode] = useState('existing'); // 'existing' | 'new'
   const [search, setSearch] = useState('');
@@ -61,6 +61,7 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
       if (payerMode === 'existing') body.payerId = Number(payerId);
       else body.newPayer = { name: np.name.trim(), phone: np.phone.trim() };
       if (f.advanceAmount !== '') { body.advanceAmount = f.advanceAmount; body.advanceDate = f.advanceDate; }
+      if (f.previousBalance !== '') body.previousBalance = f.previousBalance;
       onDone(await api.createAgreement(body));
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
@@ -105,6 +106,8 @@ export default function MoveInModal({ open, cat, unitId, onClose, onDone }) {
           <Field label="Advance received (₹, optional)" type="number" min="0" step="0.01" value={f.advanceAmount} onChange={set('advanceAmount')} />
           {f.advanceAmount !== '' && <Field label="Advance date" type="date" value={f.advanceDate} onChange={set('advanceDate')} />}
         </div>
+        <Field label="Previous balance (₹, optional)" type="number" min="0" step="0.01" value={f.previousBalance} onChange={set('previousBalance')} />
+        <p className="-mt-2 text-sm font-semibold text-muted">For an existing tenant: what they already owe you from before the start date. It is added to what they owe, and their payments clear it first.</p>
         <Field label="Notes (optional)" value={f.notes} onChange={set('notes')} />
         <p aria-live="polite" className="glass-in rounded-2xl px-4 py-3 text-sm font-bold tabnum">
           {pv ? `First due: ${formatINR(pv[0].amount)} on ${formatDate(pv[0].dueDate)}${pv[1] ? ` · Next: ${formatINR(pv[1].amount)} on ${formatDate(pv[1].dueDate)}` : ''}`

@@ -16,6 +16,7 @@ export function formatDate(s) {
 
 export function periodLabel(p) {
   if (!p) return '';
+  if (p === '0000-00') return 'Previous balance'; // owed before the tenant was entered (backend OPENING)
   const [y, m] = p.split('-').map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 }

@@ -57,7 +57,7 @@ export default function CategorySettingsPage() {
       </Card>
       <Card className="space-y-3">
         <h2 className="text-lg font-black">Archive or delete</h2>
-        <p className="text-sm font-semibold text-muted">Archiving hides the category from the sidebar and the Overview; data is kept. Delete works only for a category with nothing added under it.</p>
+        <p className="text-sm font-semibold text-muted">Archiving hides the category from the sidebar and the Overview; data is kept. Delete works only if no tenant was ever moved in under it; it removes the category with its empty groups and units.</p>
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" onClick={toggleArchive}>{cat.archived ? 'Restore category' : 'Archive category'}</Button>
           <Button variant="secondary" onClick={remove}>Delete category</Button>

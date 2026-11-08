@@ -17,6 +17,7 @@ const agreementController = require('../controllers/agreementController');
 const overviewController = require('../controllers/overviewController');
 const debtController = require('../controllers/debtController');
 const reminderController = require('../controllers/reminderController');
+const searchController = require('../controllers/searchController');
 const { forOwner } = require('../lib/ownerDb');
 
 // Public auth routes
@@ -37,6 +38,9 @@ router.post('/jobs/rent-reminders', wrap(reminderController.rentReminders));
 // Owner routes: every query below goes through req.db, pinned to the caller's ownerId.
 const ownerScope = (req, res, next) => { req.db = forOwner(req.user.id); next(); };
 router.use(authenticate, requirePasswordChanged, requireRole('ADMIN', 'MEMBER'), ownerScope);
+
+// Sidebar search across tenants and borrowers
+router.get('/search', wrap(searchController.search));
 
 // Account preferences
 router.put('/me/preferences', wrap(authController.updatePreferences));
@@ -88,8 +92,10 @@ router.put('/categories/:id', wrap(categoryController.updateCategory));
 router.delete('/categories/:id', wrap(categoryController.deleteCategory));
 router.post('/categories/:id/places', wrap(categoryController.createPlace));
 router.put('/places/:id', wrap(categoryController.updatePlace));
+router.delete('/places/:id', wrap(categoryController.deletePlace));
 router.post('/places/:id/units', wrap(categoryController.createUnit));
 router.put('/units/:id', wrap(categoryController.updateUnit));
+router.delete('/units/:id', wrap(categoryController.deleteUnit));
 
 // Payers and their logins
 router.get('/payers', wrap(payerController.listPayers));
@@ -104,6 +110,7 @@ router.post('/agreements/preview', wrap(agreementController.previewAgreement));
 router.post('/agreements', wrap(agreementController.createAgreement));
 router.get('/agreements/:id', wrap(agreementController.getAgreement));
 router.put('/agreements/:id/billing', wrap(agreementController.updateBilling));
+router.put('/agreements/:id/previous-balance', wrap(agreementController.setPreviousBalance));
 router.post('/agreements/:id/rates', wrap(agreementController.addRate));
 router.post('/agreements/:id/advance', wrap(agreementController.addAdvance));
 router.post('/agreements/:id/move-out/preview', wrap(agreementController.moveOutPreview));
